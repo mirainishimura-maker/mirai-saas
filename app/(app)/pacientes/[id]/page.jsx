@@ -12,7 +12,7 @@ import {
   sesionesDe,
   useMirai,
 } from '@/lib/store'
-import { diaYHora, fechaLarga, relativo } from '@/lib/fecha'
+import { desdeClave, diaYHora, fechaLarga, relativo } from '@/lib/fecha'
 import MapaAlianza from '@/components/mapa-alianza'
 import {
   Avatar,
@@ -223,7 +223,7 @@ function NotaHistoria({ nota, numero, onEliminar }) {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border-mist pb-4">
         <div>
           <p className="text-label-sm uppercase text-outline">
-            Sesión {numero} · {fechaLarga(nota.session_date + 'T00:00:00')} · {relativo(nota.session_date)}
+            Sesión {numero} · {fechaLarga(desdeClave(nota.session_date))} · {relativo(nota.session_date)}
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-2">
             <span className="text-label-md uppercase text-on-surface-variant">

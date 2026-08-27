@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { Sprout, TriangleAlert } from 'lucide-react'
-import { calcularOxigeno, soles, useMirai } from '@/lib/store'
-import { MESES, fechaMedia } from '@/lib/fecha'
+import { calcularOxigeno, simularSostenibilidad, soles, useMirai } from '@/lib/store'
+import { MESES, desdeClave, fechaMedia } from '@/lib/fecha'
 import ArbolDeRiqueza from '@/components/arbol'
 import Modal from '@/components/modal'
 import {
@@ -74,10 +74,7 @@ export default function Oxigeno() {
             <p className="mt-4 text-body-sm italic leading-relaxed text-on-surface-variant">
               {o.avanceMeta >= 100
                 ? 'Mes cubierto. Lo que entre de aquí en adelante puede ir al fondo semilla.'
-                : `Vas en ${o.avanceMeta}%. Faltan unas ${Math.max(
-                    0,
-                    Math.ceil((terapeuta.target_salary_monthly - o.neto) / terapeuta.tarifa_sesion),
-                  )} sesiones para cubrir el mes.`}
+                : `Vas en ${o.avanceMeta}%. Faltan unas ${o.sesionesParaLaMeta} sesiones para cubrir el mes.`}
             </p>
           </Tarjeta>
 
@@ -128,7 +125,7 @@ export default function Oxigeno() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-body-md text-on-surface">{t.category}</span>
                   <span className="text-label-sm uppercase text-outline">
-                    {fechaMedia(t.transaction_date + 'T00:00:00')}
+                    {fechaMedia(desdeClave(t.transaction_date))}
                   </span>
                 </span>
                 <span
@@ -247,10 +244,11 @@ function Simulador({ terapeuta }) {
   const [sesiones, setSesiones] = useState(terapeuta.sesiones_semanales_sostenibles)
   const [tarifa, setTarifa] = useState(terapeuta.tarifa_sesion)
 
-  const bruto = sesiones * tarifa * 4
-  const neto = bruto - terapeuta.monthly_fixed_costs
-  const semilla = Math.round((neto > 0 ? neto : 0) * (terapeuta.porcentaje_semilla / 100))
-  const excede = sesiones > terapeuta.sesiones_semanales_sostenibles
+  const { neto, semilla, techo, excede } = simularSostenibilidad({
+    terapeuta,
+    sesionesPorSemana: sesiones,
+    tarifa,
+  })
 
   return (
     <Tarjeta>
@@ -275,11 +273,10 @@ function Simulador({ terapeuta }) {
           />
           {excede && (
             <p
-              data-preserva-color
               className="mt-3 flex items-start gap-2 rounded-md border border-error/10 bg-error-container/20 p-3 text-body-sm text-alert-clinical"
             >
               <TriangleAlert size={16} strokeWidth={1.8} className="mt-0.5 shrink-0" />
-              Pasar de {terapeuta.sesiones_semanales_sostenibles} sesiones fue lo que tú misma
+              Pasar de {techo} sesiones fue lo que tú misma
               definiste como tu techo. Más allá de ahí, lo que se paga no es dinero.
             </p>
           )}

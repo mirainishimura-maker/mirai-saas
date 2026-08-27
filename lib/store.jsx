@@ -30,6 +30,29 @@ function id(prefijo) {
   return prefijo + '-' + Math.random().toString(36).slice(2, 9)
 }
 
+/** Un número utilizable, o el de reserva. Un campo vaciado llega como '' o NaN. */
+function numeroSeguro(valor, reserva, minimo = 0) {
+  const n = Number(valor)
+  if (!Number.isFinite(n) || n < minimo) return reserva
+  return n
+}
+
+/**
+ * Los ajustes son divisores de medio panel: si la tarifa o el techo de sesiones
+ * quedan en cero, la carga semanal sale Infinity y el mes "cubierto" sale NaN.
+ * Se sanean acá, al entrar, y no en cada pantalla que los usa.
+ */
+function sanearTerapeuta(t) {
+  return {
+    ...t,
+    tarifa_sesion: numeroSeguro(t.tarifa_sesion, 75, 1),
+    target_salary_monthly: numeroSeguro(t.target_salary_monthly, 0),
+    monthly_fixed_costs: numeroSeguro(t.monthly_fixed_costs, 0),
+    sesiones_semanales_sostenibles: numeroSeguro(t.sesiones_semanales_sostenibles, 20, 1),
+    porcentaje_semilla: Math.min(100, numeroSeguro(t.porcentaje_semilla, 10)),
+  }
+}
+
 export function MiraiProvider({ children }) {
   const [estado, setEstado] = useState(estadoInicial)
   const [hidratado, setHidratado] = useState(false)
@@ -37,7 +60,14 @@ export function MiraiProvider({ children }) {
   useEffect(() => {
     try {
       const crudo = window.localStorage.getItem(LLAVE)
-      if (crudo) setEstado({ ...estadoInicial(), ...JSON.parse(crudo) })
+      if (crudo) {
+        const guardado = { ...estadoInicial(), ...JSON.parse(crudo) }
+        // Lo guardado puede venir de una versión anterior de la app: se sanea
+        // al entrar para que ninguna pantalla tenga que defenderse sola.
+        guardado.terapeuta = sanearTerapeuta(guardado.terapeuta || {})
+        guardado.pendientes = (guardado.pendientes || []).filter((p) => p?.payload?.texto)
+        setEstado(guardado)
+      }
     } catch {
       // Si el guardado local está corrupto o bloqueado, seguimos con la semilla.
     }
@@ -63,7 +93,7 @@ export function MiraiProvider({ children }) {
 
     return {
       guardarAjustes(cambios) {
-        setEstado((e) => ({ ...e, terapeuta: { ...e.terapeuta, ...cambios } }))
+        setEstado((e) => ({ ...e, terapeuta: sanearTerapeuta({ ...e.terapeuta, ...cambios }) }))
       },
 
       alternarModoCalma() {
@@ -115,7 +145,7 @@ export function MiraiProvider({ children }) {
           id: id('s'),
           patient_id,
           session_date: session_date || claveDia(new Date()),
-          raw_narrative,
+          raw_narrative: raw_narrative || '',
           treatment_modality: treatment_modality || 'TCC',
           inferred_risk_level: inferred_risk_level || 'Low',
           tags: tags || [],
@@ -154,34 +184,46 @@ export function MiraiProvider({ children }) {
         setEstado((e) => {
           const cita = e.citas.find((c) => c.id === citaId)
           const citas = e.citas.map((c) => (c.id === citaId ? { ...c, status } : c))
+          const cobroId = 'ing-' + citaId
+
           // Atender una sesión genera su ingreso. Es la regla que sostiene
           // el panel de Oxígeno Clínico: se cobra lo atendido, no lo agendado.
           if (status === 'Completed' && cita) {
-            const yaCobrada = e.transacciones.some((t) => t.id === 'ing-' + citaId)
-            if (!yaCobrada) {
-              return {
-                ...e,
-                citas,
-                transacciones: [
-                  {
-                    id: 'ing-' + citaId,
-                    patient_id: cita.patient_id,
-                    amount: e.terapeuta.tarifa_sesion,
-                    transaction_type: 'Income',
-                    category: 'Sesión',
-                    transaction_date: cita.dia,
-                  },
-                  ...e.transacciones,
-                ],
-              }
+            const yaCobrada = e.transacciones.some((t) => t.id === cobroId)
+            if (yaCobrada) return { ...e, citas }
+            return {
+              ...e,
+              citas,
+              transacciones: [
+                {
+                  id: cobroId,
+                  patient_id: cita.patient_id,
+                  amount: e.terapeuta.tarifa_sesion,
+                  transaction_type: 'Income',
+                  category: 'Sesión',
+                  transaction_date: cita.dia,
+                },
+                ...e.transacciones,
+              ],
             }
           }
-          return { ...e, citas }
+
+          // Y dejar de estar atendida lo revierte: si no, marcar por error una
+          // sesión como atendida deja plata que nunca entró en el panel.
+          return {
+            ...e,
+            citas,
+            transacciones: e.transacciones.filter((t) => t.id !== cobroId),
+          }
         })
       },
 
       eliminarCita(citaId) {
-        setEstado((e) => ({ ...e, citas: e.citas.filter((c) => c.id !== citaId) }))
+        setEstado((e) => ({
+          ...e,
+          citas: e.citas.filter((c) => c.id !== citaId),
+          transacciones: e.transacciones.filter((t) => t.id !== 'ing-' + citaId),
+        }))
       },
 
       registrarMovimiento(datos) {
@@ -322,9 +364,12 @@ export function calcularOxigeno({ transacciones, citas, terapeuta }) {
   const meta = terapeuta.target_salary_monthly
   const avanceMeta = meta > 0 ? Math.min(100, Math.round((neto / meta) * 100)) : 0
 
+  const techo = numeroSeguro(terapeuta.sesiones_semanales_sostenibles, 20, 1)
+  const tarifa = numeroSeguro(terapeuta.tarifa_sesion, 75, 1)
   const lunes = inicioSemana(hoyD)
   const sesionesSemana = sesionesEnRango(citas, lunes, sumarDias(lunes, 6)).length
-  const carga = Math.round((sesionesSemana / terapeuta.sesiones_semanales_sostenibles) * 100)
+  const carga = Math.round((sesionesSemana / techo) * 100)
+  const sesionesParaLaMeta = Math.max(0, Math.ceil((meta - neto) / tarifa))
 
   // Últimas 8 semanas de ingresos, para la curva.
   const serie = []
@@ -349,9 +394,38 @@ export function calcularOxigeno({ transacciones, citas, terapeuta }) {
     avanceMeta,
     sesionesSemana,
     carga,
+    cargaTexto: textoDeCarga(carga),
+    sesionesParaLaMeta,
+    techo,
     serie,
     movimientos: [...delMes].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)),
   }
+}
+
+// Los umbrales de cuándo una semana está cargada son una regla del negocio, no
+// una decisión de maquetado: viven acá y no dentro de una pantalla.
+const CARGA_AL_LIMITE = 100
+const CARGA_ALTA = 85
+
+export function textoDeCarga(carga) {
+  if (carga > CARGA_AL_LIMITE)
+    return 'Estás por encima de tu propio techo. Considera mover algo de la próxima semana.'
+  if (carga > CARGA_ALTA) return 'Semana cargada. Deja una tarde libre si puedes.'
+  return 'Tienes aire. La agenda respira.'
+}
+
+/**
+ * El simulador de sostenibilidad: qué pasaría con otra cantidad de sesiones o
+ * con otra tarifa. Mismas reglas que el panel real, en el mismo sitio.
+ */
+export function simularSostenibilidad({ terapeuta, sesionesPorSemana, tarifa }) {
+  const sesiones = numeroSeguro(sesionesPorSemana, 1, 1)
+  const valor = numeroSeguro(tarifa, 1, 1)
+  const bruto = sesiones * valor * 4
+  const neto = bruto - numeroSeguro(terapeuta.monthly_fixed_costs, 0)
+  const semilla = Math.round((neto > 0 ? neto : 0) * (terapeuta.porcentaje_semilla / 100))
+  const techo = numeroSeguro(terapeuta.sesiones_semanales_sostenibles, 20, 1)
+  return { bruto, neto, semilla, techo, excede: sesiones > techo }
 }
 
 export function soles(monto) {

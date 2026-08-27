@@ -126,6 +126,7 @@ export default function MapaAlianza({ mapa, onCambio }) {
 
   const borrarNodo = (id) => {
     onCambio({
+      ...mapa,
       nodes: nodes.filter((n) => n.id !== id),
       links: links.filter(([a, b]) => a !== id && b !== id),
     })

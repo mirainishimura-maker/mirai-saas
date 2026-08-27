@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { soles, useMirai } from '@/lib/store'
 import {
@@ -18,6 +18,12 @@ export default function Ajustes() {
   const [datos, setDatos] = useState(terapeuta)
   const [guardado, setGuardado] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
+
+  // Reiniciar la demo cambia el estado compartido; sin esto el formulario
+  // seguiría mostrando en pantalla los valores anteriores.
+  useEffect(() => {
+    setDatos(terapeuta)
+  }, [terapeuta])
 
   const cambiar = (campo, numerico = false) => (e) => {
     setDatos({ ...datos, [campo]: numerico ? Number(e.target.value) : e.target.value })
@@ -190,16 +196,20 @@ export default function Ajustes() {
 }
 
 function Interruptor({ activo, onCambiar, titulo, texto }) {
+  const tituloId = useId()
   return (
     <div className="flex items-start justify-between gap-6">
       <div>
-        <p className="text-body-lg text-on-surface">{titulo}</p>
+        <p id={tituloId} className="text-body-lg text-on-surface">
+          {titulo}
+        </p>
         <p className="mt-1 max-w-md text-body-sm leading-relaxed text-on-surface-variant">{texto}</p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={activo}
+        aria-labelledby={tituloId}
         onClick={() => onCambiar(!activo)}
         className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
           activo ? 'bg-secondary' : 'bg-surface-variant'

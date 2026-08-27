@@ -61,6 +61,7 @@ export default function Pacientes() {
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
+              aria-label="Buscar paciente por nombre o por lo escrito en sus notas"
               placeholder="Buscar nombre o nota…"
               className={claseInput + ' pl-10'}
             />

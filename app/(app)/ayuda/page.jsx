@@ -55,7 +55,11 @@ export default function Ayuda() {
           <Tarjeta key={r.titulo}>
             <h2 className="mb-3 font-serif text-headline-md text-primary">{r.titulo}</h2>
             <p className="mb-5 text-body-md leading-relaxed text-on-surface-variant">{r.texto}</p>
-            <Link href={r.donde} className="text-label-md uppercase text-secondary hover:text-primary">
+            <Link
+              href={r.donde}
+              aria-label={`Ir a ${r.titulo}`}
+              className="text-label-md uppercase text-secondary hover:text-primary"
+            >
               Ir →
             </Link>
           </Tarjeta>

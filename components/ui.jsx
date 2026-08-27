@@ -39,7 +39,6 @@ export function ChipRiesgo({ nivel, compacto = false }) {
   if (nivel !== 'High') return null
   return (
     <span
-      data-preserva-color
       className={`inline-flex items-center gap-1.5 rounded-sm border border-error-container bg-error-container/40 text-alert-clinical ${
         compacto ? 'px-2 py-0.5 text-label-sm' : 'px-2.5 py-1 text-label-md'
       } uppercase`}
@@ -90,9 +89,10 @@ export function Rotulo({ children }) {
   return <h3 className="mb-4 text-label-sm uppercase text-on-surface-variant">{children}</h3>
 }
 
-export function BotonPrimario({ children, className = '', ...props }) {
+export function BotonPrimario({ children, className = '', type = 'button', ...props }) {
   return (
     <button
+      type={type}
       className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 text-label-md uppercase text-on-primary transition-colors hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-surface-variant disabled:text-outline ${className}`}
       {...props}
     >
@@ -101,9 +101,10 @@ export function BotonPrimario({ children, className = '', ...props }) {
   )
 }
 
-export function BotonSuave({ children, className = '', ...props }) {
+export function BotonSuave({ children, className = '', type = 'button', ...props }) {
   return (
     <button
+      type={type}
       className={`inline-flex items-center justify-center gap-2 rounded-md border border-border-sand bg-surface-card px-5 py-2.5 text-label-md uppercase text-on-surface-variant transition-colors hover:border-secondary hover:text-primary disabled:opacity-40 ${className}`}
       {...props}
     >

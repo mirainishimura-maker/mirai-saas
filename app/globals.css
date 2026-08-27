@@ -123,14 +123,58 @@ body {
   color: var(--color-on-secondary-fixed);
 }
 
-/* Modo Calma: quita todo el color de la interfaz sin apagar la app.
-   El indicador de riesgo alto conserva su color a propósito. */
-html[data-calma="on"] body {
-  filter: grayscale(1);
-  transition: filter 600ms ease;
+/* Modo Calma: quita el color de la interfaz sin apagar la app.
+   Se hace redefiniendo los tokens, NO con filter: grayscale() sobre el body.
+   Un filtro en un ancestro no se puede revertir en un descendiente: el color
+   ya viene desaturado desde arriba. Como acá los tokens de alerta clínica
+   (--color-alert-clinical, --color-error*) se quedan fuera de la lista, el
+   indicador de riesgo alto conserva su color, que es justo el punto.
+   Los grises salen de la misma fórmula de luminancia que usa grayscale(1). */
+html[data-calma="on"] {
+  --color-bg-warm: #f8f8f8;
+  --color-surface: #f9f9f9;
+  --color-surface-card: #ffffff;
+  --color-surface-dim: #dadada;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f4f4;
+  --color-surface-container: #eeeeee;
+  --color-surface-container-high: #e8e8e8;
+  --color-surface-container-highest: #e2e2e2;
+  --color-surface-variant: #e2e2e2;
+  --color-sage-bg: #ebebeb;
+  --color-inverse-surface: #303030;
+  --color-inverse-on-surface: #f1f1f1;
+  --color-on-surface: #1b1b1b;
+  --color-on-surface-variant: #474747;
+  --color-ink-deep: #4a4a4a;
+  --color-outline: #777777;
+  --color-outline-variant: #c6c6c6;
+  --color-border-sand: #e7e7e7;
+  --color-border-mist: #ededed;
+  --color-primary: #484848;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #606060;
+  --color-on-primary-container: #dbdbdb;
+  --color-primary-fixed: #e2e2e2;
+  --color-primary-fixed-dim: #c6c6c6;
+  --color-inverse-primary: #c6c6c6;
+  --color-secondary: #5e5e5e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #dfdfdf;
+  --color-on-secondary-container: #626262;
+  --color-secondary-fixed: #e2e2e2;
+  --color-secondary-fixed-dim: #c6c6c6;
+  --color-on-secondary-fixed: #1a1a1a;
+  --color-tertiary: #474747;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #5e5e5e;
+  --color-tertiary-fixed: #e1e1e1;
+  --color-tertiary-fixed-dim: #c5c5c5;
 }
-html[data-calma="on"] [data-preserva-color] {
-  filter: grayscale(0);
+
+html[data-calma="on"] body,
+html[data-calma="on"] body * {
+  transition: background-color 600ms ease, color 600ms ease, border-color 600ms ease;
 }
 
 /* Barras de scroll discretas */

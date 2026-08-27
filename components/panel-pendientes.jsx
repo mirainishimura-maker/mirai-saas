@@ -31,6 +31,8 @@ export default function PanelPendientes({ abierto, cerrar }) {
   return (
     <>
       <button
+        type="button"
+        aria-label="Cerrar pendientes"
         aria-hidden={!abierto}
         tabIndex={-1}
         onClick={cerrar}
@@ -39,6 +41,10 @@ export default function PanelPendientes({ abierto, cerrar }) {
         }`}
       />
       <aside
+        // Cerrado sigue montado para poder deslizarse; sin `inert` seguiría
+        // recibiendo el tabulador y anunciándose en los lectores de pantalla.
+        inert={abierto ? undefined : true}
+        aria-label="Pendientes administrativos"
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border-sand bg-surface transition-transform duration-500 ease-out ${
           abierto ? 'translate-x-0' : 'translate-x-full'
         }`}

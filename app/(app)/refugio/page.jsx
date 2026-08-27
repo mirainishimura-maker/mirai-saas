@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { CheckCircle2, DoorOpen, Leaf, PenLine, Video } from 'lucide-react'
 import { citasDelDia, nombrePaciente, sesionesDe, useMirai, calcularOxigeno } from '@/lib/store'
 import { fechaLarga, hoy } from '@/lib/fecha'
@@ -20,13 +21,20 @@ export default function Refugio() {
     return !previas.some((s) => s.session_date === c.dia)
   })
 
-  const hora = new Date().getHours()
-  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+  // El saludo y la fecha se resuelven después de montar. Si se leyeran durante
+  // el render, el HTML generado en el build diría una hora y el navegador otra,
+  // y React se quejaría de que no coinciden.
+  const [momento, setMomento] = useState(null)
+  useEffect(() => {
+    const hora = new Date().getHours()
+    const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+    setMomento(`${saludo} · ${fechaLarga(new Date())}`)
+  }, [])
 
   return (
     <div className="mx-auto w-full max-w-content px-margin-mobile py-10 md:px-margin-desktop">
       <Encabezado
-        sobretitulo={`${saludo} · ${fechaLarga(new Date())}`}
+        sobretitulo={momento}
         titulo="El Refugio"
         bajada="Lo único que necesitas ver antes de la primera sesión."
       />
@@ -119,7 +127,7 @@ export default function Refugio() {
               {oxigeno.sesionesSemana}
             </p>
             <p className="mt-2 text-body-sm text-on-surface-variant">
-              sesiones agendadas de {terapeuta.sesiones_semanales_sostenibles} sostenibles
+              sesiones agendadas de {oxigeno.techo} sostenibles
             </p>
             <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
               <div
@@ -128,11 +136,7 @@ export default function Refugio() {
               />
             </div>
             <p className="mt-6 text-body-sm italic leading-relaxed text-on-surface-variant">
-              {oxigeno.carga > 100
-                ? 'Estás por encima de tu propio techo. Considera mover algo de la próxima semana.'
-                : oxigeno.carga > 85
-                  ? 'Semana cargada. Deja una tarde libre si puedes.'
-                  : 'Tienes aire. La agenda respira.'}
+              {oxigeno.cargaTexto}
             </p>
           </Tarjeta>
         </aside>

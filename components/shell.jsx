@@ -36,9 +36,19 @@ export default function Shell({ children }) {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [pendientesAbierto, setPendientesAbierto] = useState(false)
 
+  const [escritorio, setEscritorio] = useState(true)
+
   useEffect(() => {
     setMenuAbierto(false)
   }, [ruta])
+
+  useEffect(() => {
+    const consulta = window.matchMedia('(min-width: 1024px)')
+    const sincronizar = () => setEscritorio(consulta.matches)
+    sincronizar()
+    consulta.addEventListener('change', sincronizar)
+    return () => consulta.removeEventListener('change', sincronizar)
+  }, [])
 
   const delDia = citasDelDia(citas, hoy())
   const atendidas = delDia.filter((c) => c.status === 'Completed').length
@@ -46,6 +56,10 @@ export default function Shell({ children }) {
   return (
     <div className="min-h-screen">
       <aside
+        id="navegacion-principal"
+        // En pantalla ancha siempre está visible; en móvil, cerrada, queda fuera
+        // del viewport y no debe seguir capturando el tabulador.
+        inert={escritorio || menuAbierto ? undefined : true}
         className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border-sand bg-sage-bg p-6 transition-transform duration-300 lg:translate-x-0 ${
           menuAbierto ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -112,6 +126,7 @@ export default function Shell({ children }) {
 
       {menuAbierto && (
         <button
+          type="button"
           aria-label="Cerrar menú"
           onClick={() => setMenuAbierto(false)}
           className="fixed inset-0 z-30 bg-inverse-surface/20 lg:hidden"
@@ -122,9 +137,12 @@ export default function Shell({ children }) {
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border-mist bg-bg-warm/90 px-margin-mobile py-4 backdrop-blur-sm md:px-margin-desktop">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() => setMenuAbierto((v) => !v)}
               className="text-primary lg:hidden"
               aria-label={menuAbierto ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={menuAbierto}
+              aria-controls="navegacion-principal"
             >
               {menuAbierto ? <X size={22} strokeWidth={1.6} /> : <Menu size={22} strokeWidth={1.6} />}
             </button>
@@ -133,7 +151,9 @@ export default function Shell({ children }) {
 
           <div className="flex items-center gap-2 md:gap-4">
             <button
+              type="button"
               onClick={alternarModoCalma}
+              aria-pressed={terapeuta.modo_calma}
               className={`rounded-full px-4 py-2 text-label-md uppercase transition-colors ${
                 terapeuta.modo_calma
                   ? 'bg-secondary-fixed text-on-secondary-fixed'
@@ -144,6 +164,7 @@ export default function Shell({ children }) {
               <span className="hidden sm:inline">Modo </span>calma
             </button>
             <button
+              type="button"
               onClick={() => setPendientesAbierto(true)}
               className="flex items-center gap-2 rounded-full border border-border-mist bg-surface-card px-4 py-2 text-on-surface-variant transition-colors hover:text-primary"
               title="Lo administrativo te espera aquí. No te interrumpe."

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, Sparkles } from 'lucide-react'
 import { nombrePaciente, useMirai } from '@/lib/store'
 import { fechaLarga } from '@/lib/fecha'
@@ -59,9 +59,36 @@ function LienzoDeEnfoque() {
   const pregunta = useMemo(() => PREGUNTAS[texto.length % PREGUNTAS.length], [texto.length])
   const palabras = texto.trim() ? texto.trim().split(/\s+/).length : 0
 
+  // Al cambiar de paciente el riesgo se recalcula en los dos sentidos: si solo
+  // subiera, una nota de alguien sin indicadores heredaría el riesgo alto del
+  // paciente anterior.
   useEffect(() => {
-    if (paciente && paciente.inferred_risk_level === 'High') setRiesgo('High')
-  }, [paciente])
+    const elegido = pacientes.find((p) => p.id === pacienteId)
+    setRiesgo(elegido?.inferred_risk_level === 'High' ? 'High' : 'Low')
+  }, [pacienteId, pacientes])
+
+  // Lo que se va a guardar, siempre al día. El temporizador de la pausa se crea
+  // una sola vez y de otro modo se quedaría con el texto que había al pulsar el
+  // botón, perdiendo lo que se escriba durante esos dos segundos.
+  const borrador = useRef({})
+  borrador.current = { pacienteId, texto, modalidad, riesgo, etiquetas }
+
+  const confirmar = useCallback(() => {
+    const b = borrador.current
+    if (!b.pacienteId || !b.texto.trim()) return
+    const nota = guardarNota({
+      patient_id: b.pacienteId,
+      raw_narrative: b.texto.trim(),
+      treatment_modality: b.modalidad,
+      inferred_risk_level: b.riesgo,
+      tags: b.etiquetas
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean),
+    })
+    setFase('guardada')
+    setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
+  }, [guardarNota, router])
 
   // La fricción reflexiva: dos segundos entre decidir guardar y guardar.
   // No es una animación de carga — es el tiempo de releer lo que escribiste.
@@ -77,23 +104,7 @@ function LienzoDeEnfoque() {
       }
     }, 40)
     return () => clearInterval(tic)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase])
-
-  const confirmar = () => {
-    const nota = guardarNota({
-      patient_id: pacienteId,
-      raw_narrative: texto.trim(),
-      treatment_modality: modalidad,
-      inferred_risk_level: riesgo,
-      tags: etiquetas
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean),
-    })
-    setFase('guardada')
-    setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
-  }
+  }, [fase, confirmar])
 
   const iniciarGuardado = () => {
     if (!pacienteId || !texto.trim()) return
@@ -134,6 +145,7 @@ function LienzoDeEnfoque() {
             <select
               value={pacienteId}
               onChange={(e) => setPacienteId(e.target.value)}
+              aria-label="Paciente de esta sesión"
               className="rounded-md border border-border-sand bg-surface-card px-4 py-2 text-body-md text-on-surface focus:border-secondary focus:outline-none"
             >
               <option value="">¿De quién es esta sesión?</option>
@@ -164,8 +176,13 @@ function LienzoDeEnfoque() {
             ref={areaRef}
             autoFocus
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => {
+              setTexto(e.target.value)
+              // Si vuelves a escribir, la nota no estaba lista: la pausa se cae.
+              if (fase === 'pausa') cancelarPausa()
+            }}
             disabled={fase === 'guardada'}
+            aria-label="Nota clínica de la sesión"
             placeholder="Escribe libremente aquí tu análisis clínico. La estructura se procesa después."
             className="min-h-[45vh] w-full resize-none border-none bg-transparent font-serif text-body-lg leading-relaxed text-on-surface placeholder:text-outline-variant/70 focus:outline-none md:text-[20px]"
           />

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { PenLine, Search } from 'lucide-react'
 import { nombrePaciente, useMirai } from '@/lib/store'
-import { fechaLarga, relativo } from '@/lib/fecha'
+import { desdeClave, fechaLarga, relativo } from '@/lib/fecha'
 import { Avatar, ChipRiesgo, claseInput, Encabezado, Vacio } from '@/components/ui'
 
 export default function Notas() {
@@ -51,6 +51,7 @@ export default function Notas() {
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
+            aria-label="Buscar dentro de las notas"
             placeholder="Buscar dentro de las notas…"
             className={claseInput + ' pl-10'}
           />
@@ -58,6 +59,7 @@ export default function Notas() {
         <select
           value={pacienteId}
           onChange={(e) => setPacienteId(e.target.value)}
+          aria-label="Filtrar por paciente"
           className={claseInput + ' sm:w-64'}
         >
           <option value="todos">Todos los pacientes</option>
@@ -71,11 +73,19 @@ export default function Notas() {
 
       {resultado.length === 0 ? (
         <Vacio
-          titulo={busqueda ? 'Nada coincide con esa palabra.' : 'Todavía no hay notas.'}
+          titulo={
+            busqueda
+              ? 'Nada coincide con esa palabra.'
+              : pacienteId !== 'todos'
+                ? 'Este paciente todavía no tiene notas.'
+                : 'Todavía no hay notas.'
+          }
           texto={
             busqueda
               ? 'Prueba con una palabra que hayas usado tú al escribir, no con un término técnico.'
-              : 'Cuando escribas la primera, aparecerá aquí junto a todas las demás.'
+              : pacienteId !== 'todos'
+                ? 'Cuando escribas la primera sesión suya, aparecerá aquí.'
+                : 'Cuando escribas la primera, aparecerá aquí junto a todas las demás.'
           }
         />
       ) : (
@@ -95,7 +105,7 @@ export default function Notas() {
                         {nombrePaciente(p)}
                       </span>
                       <span className="text-label-sm uppercase text-outline">
-                        {fechaLarga(nota.session_date + 'T00:00:00')} · {relativo(nota.session_date)}
+                        {fechaLarga(desdeClave(nota.session_date))} · {relativo(nota.session_date)}
                       </span>
                       <ChipRiesgo nivel={nota.inferred_risk_level} compacto />
                     </div>

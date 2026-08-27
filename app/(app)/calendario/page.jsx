@@ -165,8 +165,8 @@ function Calendario() {
               />
             </div>
             <p className="mt-6 text-body-sm leading-relaxed italic text-on-surface-variant">
-              {oxigeno.sesionesSemana} sesiones esta semana de{' '}
-              {terapeuta.sesiones_semanales_sostenibles} que definiste como sostenibles.
+              {oxigeno.sesionesSemana} sesiones esta semana de {oxigeno.techo} que definiste como
+              sostenibles.
             </p>
             <Link
               href="/oxigeno"
@@ -349,7 +349,6 @@ function VistaSemana({ semana, citas, paciente, onElegir }) {
                         ? 'bg-error-container/40 text-alert-clinical'
                         : 'bg-secondary-fixed/40 text-on-secondary-fixed'
                     }`}
-                    data-preserva-color={p?.inferred_risk_level === 'High' ? '' : undefined}
                   >
                     {c.inicio} {p?.first_name}
                   </span>
@@ -497,6 +496,7 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
     setDatos((d) => {
       // Al mover la hora de inicio, la de fin la sigue manteniendo la duración.
       if (campo === 'inicio') {
+        if (!valor) return { ...d, inicio: valor }
         const dur = aMinutos(d.fin) - aMinutos(d.inicio)
         return { ...d, inicio: valor, fin: aHora(aMinutos(valor) + (dur > 0 ? dur : 60)) }
       }
@@ -504,9 +504,14 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
     })
   }
 
+  // Una sesión que termina antes de empezar no es un detalle de formato: crea
+  // una cita imposible que después descuadra el día.
+  const horasValidas =
+    Boolean(datos.inicio) && Boolean(datos.fin) && aMinutos(datos.fin) > aMinutos(datos.inicio)
+
   const enviar = (e) => {
     e.preventDefault()
-    if (!datos.patient_id) return
+    if (!datos.patient_id || !datos.dia || !horasValidas) return
     crear(datos)
     cerrar()
   }
@@ -535,6 +540,12 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
             <input type="time" value={datos.fin} onChange={cambiar('fin')} className={claseInput} />
           </Campo>
         </div>
+
+        {!horasValidas && (
+          <p className="text-body-sm text-alert-clinical">
+            La sesión tiene que terminar después de empezar.
+          </p>
+        )}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Campo etiqueta="Modalidad">
@@ -568,7 +579,9 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
           <BotonSuave type="button" onClick={cerrar}>
             Cancelar
           </BotonSuave>
-          <BotonPrimario type="submit">Agendar</BotonPrimario>
+          <BotonPrimario type="submit" disabled={!horasValidas}>
+            Agendar
+          </BotonPrimario>
         </div>
       </form>
     </Modal>
