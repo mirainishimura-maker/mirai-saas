@@ -49,6 +49,18 @@ function PerfilPaciente() {
   } = useMirai()
   const parametros = useSearchParams()
   const [pestana, setPestana] = useState(parametros.get('vista') || 'historia')
+  const [falloMapa, setFalloMapa] = useState(null)
+
+  // Guardar el mapa puede fallar y la pantalla vuelve al último confirmado.
+  // Sin este aviso, la terapeuta vería su cambio desaparecer sin explicación.
+  const guardarMapaDelPaciente = async (contenido, pacienteId) => {
+    try {
+      setFalloMapa(null)
+      await guardarMapa(pacienteId, contenido)
+    } catch (fallo) {
+      setFalloMapa({ contenido, mensaje: fallo.message || 'No se pudo guardar el mapa.' })
+    }
+  }
 
   const paciente = pacientes.find((p) => p.id === id)
 
@@ -192,7 +204,27 @@ function PerfilPaciente() {
       {pestana === 'mapa' && (
         <div className="grid gap-gutter lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <MapaAlianza mapa={mapa} onCambio={(m) => guardarMapa(paciente.id, m)} />
+            {falloMapa && (
+              <div
+                role="alert"
+                className="mb-4 flex flex-wrap items-center gap-4 rounded-md border border-error-container bg-error-container/30 p-4"
+              >
+                <p className="flex-1 text-body-sm text-alert-clinical">
+                  {falloMapa.mensaje} Se muestra la última versión guardada.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => guardarMapaDelPaciente(falloMapa.contenido, paciente.id)}
+                  className="rounded-md border border-alert-clinical px-4 py-2 text-label-md uppercase text-alert-clinical"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+            <MapaAlianza
+              mapa={mapa}
+              onCambio={(m) => guardarMapaDelPaciente(m, paciente.id)}
+            />
           </div>
           <aside className="lg:col-span-4">
             <LineaDeFases

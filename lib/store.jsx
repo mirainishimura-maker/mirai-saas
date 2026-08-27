@@ -114,14 +114,22 @@ export function MiraiProvider({ children }) {
     document.documentElement.dataset.calma = estado.terapeuta.modo_calma ? 'on' : 'off'
   }, [estado.terapeuta])
 
+  // Cola, turno y último valor confirmado por el servidor, por paciente.
+  const colaMapa = useRef(new Map()).current
+  const turnosMapa = useRef(new Map()).current
+  const confirmadoMapa = useRef(new Map()).current
+
   const recargar = useCallback(async () => {
     const cargado = await adaptadorRef.current.cargarTodo()
     setEstado(cargado)
-  }, [])
-
-  // Cola y turno por paciente para las escrituras del mapa.
-  const colaMapa = useRef(new Map()).current
-  const turnosMapa = useRef(new Map()).current
+    // Lo que acaba de llegar del servidor ES lo confirmado; lo que hubiera
+    // apuntado antes ya no vale.
+    confirmadoMapa.clear()
+    for (const [id, contenido] of Object.entries(cargado.mapas || {})) {
+      confirmadoMapa.set(id, contenido)
+    }
+    return cargado
+  }, [confirmadoMapa])
 
   const acciones = useMemo(() => {
     // Cada acción escribe primero donde toque y luego refleja el cambio en
@@ -238,11 +246,16 @@ export function MiraiProvider({ children }) {
       },
 
       async guardarMapa(pacienteId, contenido) {
-        const previo = estadoActual().mapas[pacienteId]
         // El mapa se arrastra, así que salen muchas escrituras seguidas. Se
-        // encolan por paciente para que no lleguen desordenadas, y solo se
-        // revierte si esta seguía siendo la última: si no, el rollback de una
-        // vieja pisaría una edición posterior que sí se guardó.
+        // encolan por paciente para que no lleguen desordenadas.
+        //
+        // El rollback vuelve al último mapa CONFIRMADO por el servidor, no al
+        // que hubiera en pantalla: con dos fallos seguidos, volver al anterior
+        // optimista dejaría en pantalla un mapa que tampoco llegó a guardarse.
+        if (!confirmadoMapa.has(pacienteId)) {
+          confirmadoMapa.set(pacienteId, estadoActual().mapas[pacienteId])
+        }
+
         const turno = (turnosMapa.get(pacienteId) || 0) + 1
         turnosMapa.set(pacienteId, turno)
 
@@ -256,9 +269,13 @@ export function MiraiProvider({ children }) {
 
         try {
           await actual
+          confirmadoMapa.set(pacienteId, contenido)
         } catch (fallo) {
+          // Solo la última escritura pendiente revierte: si no, una vieja que
+          // falla pisaría una edición posterior que sí se guardó.
           if (turnosMapa.get(pacienteId) === turno) {
-            setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: previo } }))
+            const confirmado = confirmadoMapa.get(pacienteId)
+            setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: confirmado } }))
           }
           throw fallo
         }
