@@ -30,6 +30,23 @@ function id(prefijo) {
   return prefijo + '-' + Math.random().toString(36).slice(2, 9)
 }
 
+const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** Minutos desde medianoche, o null si la hora no es una hora. */
+export function minutosDelDia(hhmm) {
+  if (typeof hhmm !== 'string' || !HORA.test(hhmm)) return null
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** Una cita necesita paciente, día y un intervalo que avance en el tiempo. */
+export function citaValida(datos) {
+  if (!datos?.patient_id || !datos?.dia) return false
+  const inicio = minutosDelDia(datos.inicio)
+  const fin = minutosDelDia(datos.fin)
+  return inicio !== null && fin !== null && fin > inicio
+}
+
 /** Un número utilizable, o el de reserva. Un campo vaciado llega como '' o NaN. */
 function numeroSeguro(valor, reserva, minimo = 0) {
   const n = Number(valor)
@@ -168,6 +185,9 @@ export function MiraiProvider({ children }) {
       },
 
       crearCita(datos) {
+        // La invariante vive acá, no solo en el formulario: una cita que
+        // termina antes de empezar descuadra el día entero y se persiste igual.
+        if (!citaValida(datos)) return null
         const cita = {
           id: id('c'),
           status: 'Scheduled',

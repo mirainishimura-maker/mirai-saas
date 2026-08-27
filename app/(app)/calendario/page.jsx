@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { CalendarPlus, ChevronLeft, ChevronRight, DoorOpen, Video } from 'lucide-react'
-import { citasDelDia, nombrePaciente, useMirai, calcularOxigeno } from '@/lib/store'
+import { citaValida, citasDelDia, nombrePaciente, useMirai, calcularOxigeno } from '@/lib/store'
 import {
   DIAS_CORTOS,
   MESES,
@@ -196,9 +196,11 @@ function Calendario() {
         pacientePrevio={pacientePrevio}
         diaPorDefecto={dia}
         crear={(datos) => {
-          crearCita(datos)
+          const cita = crearCita(datos)
+          if (!cita) return false
           setDia(desdeClave(datos.dia))
           setVista('dia')
+          return true
         }}
       />
     </div>
@@ -504,16 +506,14 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
     })
   }
 
-  // Una sesión que termina antes de empezar no es un detalle de formato: crea
-  // una cita imposible que después descuadra el día.
-  const horasValidas =
-    Boolean(datos.inicio) && Boolean(datos.fin) && aMinutos(datos.fin) > aMinutos(datos.inicio)
+  // Misma regla que aplica lib/store.jsx al guardar: una sesión que termina
+  // antes de empezar no se agenda. Acá solo se avisa antes de intentarlo.
+  const valida = citaValida(datos)
 
   const enviar = (e) => {
     e.preventDefault()
-    if (!datos.patient_id || !datos.dia || !horasValidas) return
-    crear(datos)
-    cerrar()
+    if (!valida) return
+    if (crear(datos)) cerrar()
   }
 
   return (
@@ -541,8 +541,8 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
           </Campo>
         </div>
 
-        {!horasValidas && (
-          <p className="text-body-sm text-alert-clinical">
+        {!valida && (
+          <p role="alert" className="text-body-sm text-alert-clinical">
             La sesión tiene que terminar después de empezar.
           </p>
         )}
@@ -579,7 +579,7 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
           <BotonSuave type="button" onClick={cerrar}>
             Cancelar
           </BotonSuave>
-          <BotonPrimario type="submit" disabled={!horasValidas}>
+          <BotonPrimario type="submit" disabled={!valida}>
             Agendar
           </BotonPrimario>
         </div>

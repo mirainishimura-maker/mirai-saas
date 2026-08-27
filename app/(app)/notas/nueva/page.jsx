@@ -67,28 +67,30 @@ function LienzoDeEnfoque() {
     setRiesgo(elegido?.inferred_risk_level === 'High' ? 'High' : 'Low')
   }, [pacienteId, pacientes])
 
-  // Lo que se va a guardar, siempre al día. El temporizador de la pausa se crea
-  // una sola vez y de otro modo se quedaría con el texto que había al pulsar el
-  // botón, perdiendo lo que se escriba durante esos dos segundos.
-  const borrador = useRef({})
-  borrador.current = { pacienteId, texto, modalidad, riesgo, etiquetas }
+  // Lo que se guardará, congelado en el momento en que empieza la pausa. Se
+  // escribe desde un manejador, nunca durante el render: React puede descartar
+  // un render y dejar en la ref algo que nunca llegó a pantalla.
+  const congelado = useRef(null)
 
-  const confirmar = useCallback(() => {
-    const b = borrador.current
-    if (!b.pacienteId || !b.texto.trim()) return
-    const nota = guardarNota({
-      patient_id: b.pacienteId,
-      raw_narrative: b.texto.trim(),
-      treatment_modality: b.modalidad,
-      inferred_risk_level: b.riesgo,
-      tags: b.etiquetas
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean),
-    })
-    setFase('guardada')
-    setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
-  }, [guardarNota, router])
+  const confirmar = useCallback(
+    (datos) => {
+      const b = datos || congelado.current
+      if (!b || !b.pacienteId || !b.texto.trim()) return
+      const nota = guardarNota({
+        patient_id: b.pacienteId,
+        raw_narrative: b.texto.trim(),
+        treatment_modality: b.modalidad,
+        inferred_risk_level: b.riesgo,
+        tags: b.etiquetas
+          .split(',')
+          .map((t) => t.trim().toLowerCase())
+          .filter(Boolean),
+      })
+      setFase('guardada')
+      setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
+    },
+    [guardarNota, router],
+  )
 
   // La fricción reflexiva: dos segundos entre decidir guardar y guardar.
   // No es una animación de carga — es el tiempo de releer lo que escribiste.
@@ -108,19 +110,28 @@ function LienzoDeEnfoque() {
 
   const iniciarGuardado = () => {
     if (!pacienteId || !texto.trim()) return
+    const datos = { pacienteId, texto, modalidad, riesgo, etiquetas }
     if (!terapeuta.friccion_reflexiva) {
-      confirmar()
+      confirmar(datos)
       return
     }
+    // Durante la pausa la nota queda tal como está y los campos se bloquean:
+    // esos dos segundos son para releer, no para seguir editando. Así lo que se
+    // guarda es exactamente lo que estás viendo en pantalla.
+    congelado.current = datos
     setProgreso(0)
     setFase('pausa')
   }
 
   const cancelarPausa = () => {
+    congelado.current = null
     setFase('escribiendo')
     setProgreso(0)
     areaRef.current?.focus()
   }
+
+  const enPausa = fase === 'pausa'
+  const bloqueado = enPausa || fase === 'guardada'
 
   const insertarPlantilla = () => {
     const secciones = PLANTILLAS[modalidad] || PLANTILLAS.TCC
@@ -145,6 +156,7 @@ function LienzoDeEnfoque() {
             <select
               value={pacienteId}
               onChange={(e) => setPacienteId(e.target.value)}
+              disabled={bloqueado}
               aria-label="Paciente de esta sesión"
               className="rounded-md border border-border-sand bg-surface-card px-4 py-2 text-body-md text-on-surface focus:border-secondary focus:outline-none"
             >
@@ -156,7 +168,9 @@ function LienzoDeEnfoque() {
               ))}
             </select>
             <button
+              type="button"
               onClick={insertarPlantilla}
+              disabled={bloqueado}
               className="inline-flex items-center gap-2 rounded-md border border-border-sand bg-surface-card px-4 py-2 text-label-md uppercase text-on-surface-variant transition-colors hover:border-secondary hover:text-primary"
               title={`Inserta el andamiaje de ${modalidad} como texto, no como formulario`}
             >
@@ -176,15 +190,11 @@ function LienzoDeEnfoque() {
             ref={areaRef}
             autoFocus
             value={texto}
-            onChange={(e) => {
-              setTexto(e.target.value)
-              // Si vuelves a escribir, la nota no estaba lista: la pausa se cae.
-              if (fase === 'pausa') cancelarPausa()
-            }}
-            disabled={fase === 'guardada'}
+            onChange={(e) => setTexto(e.target.value)}
+            disabled={bloqueado}
             aria-label="Nota clínica de la sesión"
             placeholder="Escribe libremente aquí tu análisis clínico. La estructura se procesa después."
-            className="min-h-[45vh] w-full resize-none border-none bg-transparent font-serif text-body-lg leading-relaxed text-on-surface placeholder:text-outline-variant/70 focus:outline-none md:text-[20px]"
+            className="min-h-[45vh] w-full resize-none border-none bg-transparent font-serif text-body-lg leading-relaxed text-on-surface placeholder:text-outline-variant/70 focus:outline-none disabled:opacity-100 md:text-[20px]"
           />
 
           <div className="mt-10 flex flex-wrap gap-4 border-t border-border-mist pt-6">
@@ -195,6 +205,7 @@ function LienzoDeEnfoque() {
               <input
                 value={etiquetas}
                 onChange={(e) => setEtiquetas(e.target.value)}
+                disabled={bloqueado}
                 placeholder="separadas por coma"
                 className="w-full border-b border-border-sand bg-transparent pb-2 text-body-md text-on-surface placeholder:text-outline-variant focus:border-secondary focus:outline-none"
               />
@@ -206,6 +217,7 @@ function LienzoDeEnfoque() {
               <select
                 value={riesgo}
                 onChange={(e) => setRiesgo(e.target.value)}
+                disabled={bloqueado}
                 className="w-full border-b border-border-sand bg-transparent pb-2 text-body-md text-on-surface focus:border-secondary focus:outline-none"
               >
                 <option value="Low">Sin indicadores</option>
