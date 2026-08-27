@@ -1,6 +1,6 @@
 # Base de datos de Mirai
 
-Cuatro archivos, en este orden. Se ejecutan en el **SQL Editor** de Supabase,
+Cinco archivos, en este orden. Se ejecutan en el **SQL Editor** de Supabase,
 pegando el contenido de cada uno y dándole a *Run*.
 
 | # | Archivo | Qué hace |
@@ -9,6 +9,7 @@ pegando el contenido de cada uno y dándole a *Run*.
 | 2 | `02-rls.sql` | Aísla los datos: cada terapeuta solo ve los suyos, y Postgres lo impone. |
 | 3 | `03-cifrado.sql` | Cifra las narrativas clínicas y expone las funciones para leerlas y exportarlas. |
 | 4 | `04-auditoria.sql` | Registra quién abrió qué historia y cuándo. |
+| 5 | `05-operaciones.sql` | Atender una sesión y cobrarla como una sola operación. |
 
 ## Antes del paso 3: crear la llave
 
@@ -51,6 +52,31 @@ paciente real, la prueba es esta:
 
 Si el paso 4 devuelve datos, hay algo mal en `02-rls.sql` y no se sigue
 adelante.
+
+### Y comprobar los permisos de las funciones
+
+Postgres concede `EXECUTE` a `PUBLIC` en toda función nueva, y PostgREST
+publica como RPC lo que viva en el esquema `public`. Una revocación que se
+olvide de `PUBLIC` no cierra nada, aunque lo parezca: el rol anónimo hereda
+el permiso igual. Esta consulta tiene que devolver **cero filas**:
+
+```sql
+select p.proname, coalesce(r.rolname, 'PUBLIC') as quien_puede_ejecutar
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+left join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a on true
+left join pg_roles r on r.oid = a.grantee
+where n.nspname = 'public'
+  and p.proname in (
+    'clave_notas', 'registrar_acceso', 'purgar_registro_viejo', 'crear_perfil_terapeuta'
+  )
+  and a.privilege_type = 'EXECUTE'
+  and (a.grantee = 0 or r.rolname in ('anon', 'authenticated'));
+```
+
+`grantee = 0` es `PUBLIC`. Si `clave_notas` aparece en esa lista, la llave
+de cifrado está a una llamada de distancia de cualquiera que tenga la llave
+anónima, y esa llave viaja en el navegador de todo el mundo.
 
 ## Lo que este esquema NO resuelve
 

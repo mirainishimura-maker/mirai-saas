@@ -9,8 +9,11 @@
 -- Orden: 01-esquema → 02-rls → 03-cifrado → 04-auditoria
 -- ─────────────────────────────────────────────────────────────────────
 
-create extension if not exists "uuid-ossp";
-create extension if not exists pgcrypto;
+-- pgcrypto va al esquema 'extensions', que es donde Supabase pone las suyas.
+-- Los identificadores usan gen_random_uuid(), que es de pg_catalog desde
+-- Postgres 13 y no necesita extensión ninguna.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 -- 1. TERAPEUTAS ───────────────────────────────────────────────────────
 -- Extiende auth.users. Una fila por cuenta; el id ES el de Supabase Auth.
@@ -37,7 +40,7 @@ create or replace function public.crear_perfil_terapeuta()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
     insert into public.therapists (id, full_name)
@@ -54,7 +57,7 @@ create trigger al_crear_usuario
 
 -- 2. PACIENTES ────────────────────────────────────────────────────────
 create table if not exists public.patients (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     therapist_id uuid not null references public.therapists(id) on delete cascade,
     first_name text not null,
     last_name text not null default '',
@@ -85,7 +88,7 @@ create index if not exists idx_patients_riesgo
 -- La narrativa NUNCA se guarda en claro. Solo entra y sale por las
 -- funciones de 03-cifrado.sql, que descifran del lado del servidor.
 create table if not exists public.clinical_sessions (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     therapist_id uuid not null references public.therapists(id) on delete cascade,
     patient_id uuid not null references public.patients(id) on delete cascade,
     session_date date not null default current_date,
@@ -108,7 +111,7 @@ create index if not exists idx_sessions_tags on public.clinical_sessions using g
 
 -- 4. CITAS ────────────────────────────────────────────────────────────
 create table if not exists public.appointments (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     therapist_id uuid not null references public.therapists(id) on delete cascade,
     patient_id uuid not null references public.patients(id) on delete cascade,
     dia date not null,
@@ -132,7 +135,7 @@ create index if not exists idx_appointments_dia on public.appointments (therapis
 
 -- 5. MOVIMIENTOS ──────────────────────────────────────────────────────
 create table if not exists public.financial_transactions (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     therapist_id uuid not null references public.therapists(id) on delete cascade,
     patient_id uuid references public.patients(id) on delete set null,
     appointment_id uuid references public.appointments(id) on delete cascade,
@@ -160,7 +163,7 @@ create table if not exists public.alliance_maps (
 
 -- 7. BUFFER ADMINISTRATIVO ────────────────────────────────────────────
 create table if not exists public.administrative_buffer (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     therapist_id uuid not null references public.therapists(id) on delete cascade,
     event_type varchar(50) not null,
     payload jsonb not null default '{}'::jsonb,

@@ -25,10 +25,6 @@ export default function Oxigeno() {
     [transacciones, citas, terapeuta],
   )
 
-  const sesionesCobradas = o.movimientos.filter(
-    (t) => t.transaction_type === 'Income' && t.category === 'Sesión',
-  ).length
-
   const mesActual = MESES[new Date().getMonth()]
 
   return (
@@ -91,12 +87,12 @@ export default function Oxigeno() {
             <h2 className="font-serif text-headline-lg text-ink-deep">Árbol de la riqueza</h2>
             <ArbolDeRiqueza
               avance={o.avanceMeta}
-              sesionesCobradas={sesionesCobradas}
-              raices={Math.min(100, (o.semilla / (terapeuta.target_salary_monthly * 0.1 || 1)) * 100)}
+              sesionesCobradas={o.sesionesCobradas}
+              raices={o.raices}
             />
             <div className="grid w-full max-w-md grid-cols-3 gap-4 text-center">
               <Dato etiqueta="Copa" valor={`${o.avanceMeta}%`} pie="de tu meta" />
-              <Dato etiqueta="Frutos" valor={sesionesCobradas} pie="sesiones cobradas" />
+              <Dato etiqueta="Frutos" valor={o.sesionesCobradas} pie="sesiones cobradas" />
               <Dato etiqueta="Raíz" valor={soles(o.semilla)} pie={`fondo semilla ${terapeuta.porcentaje_semilla}%`} />
             </div>
             <p className="max-w-sm text-center text-body-sm italic leading-relaxed text-on-surface-variant">
@@ -273,6 +269,7 @@ function Simulador({ terapeuta }) {
           />
           {excede && (
             <p
+              role="alert"
               className="mt-3 flex items-start gap-2 rounded-md border border-error/10 bg-error-container/20 p-3 text-body-sm text-alert-clinical"
             >
               <TriangleAlert size={16} strokeWidth={1.8} className="mt-0.5 shrink-0" />
@@ -334,16 +331,29 @@ function ModalMovimiento({ abierto, cerrar, registrar }) {
     amount: '',
     category: 'Alquiler de consultorio',
   })
+  const [fallo, setFallo] = useState(null)
+  const [guardando, setGuardando] = useState(false)
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value })
 
-  const enviar = (e) => {
+  const enviar = async (e) => {
     e.preventDefault()
     const monto = Number(datos.amount)
-    if (!monto || monto <= 0) return
-    registrar({ ...datos, amount: monto })
-    setDatos({ transaction_type: 'Expense', amount: '', category: 'Alquiler de consultorio' })
-    cerrar()
+    if (!Number.isFinite(monto) || monto <= 0) {
+      setFallo('Escribe un monto mayor que cero.')
+      return
+    }
+    setFallo(null)
+    setGuardando(true)
+    try {
+      await registrar({ ...datos, amount: monto })
+      setDatos({ transaction_type: 'Expense', amount: '', category: 'Alquiler de consultorio' })
+      cerrar()
+    } catch (e2) {
+      setFallo(e2.message || 'No se pudo registrar el movimiento.')
+    } finally {
+      setGuardando(false)
+    }
   }
 
   const categorias =
@@ -408,11 +418,19 @@ function ModalMovimiento({ abierto, cerrar, registrar }) {
           </select>
         </Campo>
 
+        {fallo && (
+          <p role="alert" className="text-body-sm text-alert-clinical">
+            {fallo}
+          </p>
+        )}
+
         <div className="flex justify-end gap-3 pt-2">
           <BotonSuave type="button" onClick={cerrar}>
             Cancelar
           </BotonSuave>
-          <BotonPrimario type="submit">Registrar</BotonPrimario>
+          <BotonPrimario type="submit" disabled={guardando}>
+            {guardando ? 'Registrando…' : 'Registrar'}
+          </BotonPrimario>
         </div>
       </form>
     </Modal>

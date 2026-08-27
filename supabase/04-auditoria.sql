@@ -44,7 +44,7 @@ create or replace function public.registrar_acceso(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
     if auth.uid() is null then
@@ -55,15 +55,25 @@ begin
 end;
 $$;
 
-revoke all on function public.registrar_acceso(varchar, uuid, uuid) from anon, authenticated;
+-- Esta es la revocación que hace que el registro valga algo. Sin quitársela
+-- a PUBLIC, cualquiera con sesión podría invocarla por RPC y fabricar
+-- accesos que nunca ocurrieron, que es justo lo contrario de una auditoría.
+-- Las funciones de 03-cifrado.sql la siguen llamando porque se ejecutan
+-- como su propietario, no como quien las invoca.
+revoke all on function public.registrar_acceso(varchar, uuid, uuid)
+    from public, anon, authenticated;
 
 -- Purga: el registro crece para siempre si nadie lo corta. Dos años es un
 -- plazo razonable para una consulta pequeña; ajustar si hace falta.
+-- La ejecuta una tarea programada con la llave de servicio, nunca la app.
 create or replace function public.purgar_registro_viejo()
 returns void
 language sql
 security definer
-set search_path = public
+set search_path = ''
 as $$
     delete from public.access_log where ocurrido_el < now() - interval '2 years';
 $$;
+
+revoke all on function public.purgar_registro_viejo() from public, anon, authenticated;
+grant execute on function public.purgar_registro_viejo() to service_role;

@@ -52,6 +52,7 @@ function LienzoDeEnfoque() {
   const [riesgo, setRiesgo] = useState('Low')
   const [fase, setFase] = useState('escribiendo') // escribiendo | pausa | guardada
   const [progreso, setProgreso] = useState(0)
+  const [fallo, setFallo] = useState(null)
   const areaRef = useRef(null)
 
   const paciente = pacientes.find((p) => p.id === pacienteId)
@@ -78,21 +79,30 @@ function LienzoDeEnfoque() {
   useEffect(() => () => clearTimeout(salida.current), [])
 
   const confirmar = useCallback(
-    (datos) => {
+    async (datos) => {
       const b = datos || congelado.current
       if (!b || !b.pacienteId || !b.texto.trim()) return
-      const nota = guardarNota({
-        patient_id: b.pacienteId,
-        raw_narrative: b.texto.trim(),
-        treatment_modality: b.modalidad,
-        inferred_risk_level: b.riesgo,
-        tags: b.etiquetas
-          .split(',')
-          .map((t) => t.trim().toLowerCase())
-          .filter(Boolean),
-      })
-      setFase('guardada')
-      salida.current = setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
+      try {
+        // La nota se da por guardada cuando está guardada de verdad. Decirlo
+        // antes sería lo peor que puede hacer esta pantalla: la terapeuta
+        // cierra la laptop tranquila y el texto no llegó a ninguna parte.
+        const nota = await guardarNota({
+          patient_id: b.pacienteId,
+          raw_narrative: b.texto.trim(),
+          treatment_modality: b.modalidad,
+          inferred_risk_level: b.riesgo,
+          tags: b.etiquetas
+            .split(',')
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean),
+        })
+        setFase('guardada')
+        salida.current = setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
+      } catch (fallo) {
+        setFallo(fallo.message || 'No se pudo guardar la nota. Tu texto sigue acá.')
+        setFase('escribiendo')
+        setProgreso(0)
+      }
     },
     [guardarNota, router],
   )
@@ -115,6 +125,7 @@ function LienzoDeEnfoque() {
 
   const iniciarGuardado = () => {
     if (!pacienteId || !texto.trim()) return
+    setFallo(null)
     const datos = { pacienteId, texto, modalidad, riesgo, etiquetas }
     if (!terapeuta.friccion_reflexiva) {
       confirmar(datos)
@@ -271,7 +282,16 @@ function LienzoDeEnfoque() {
           </div>
         </div>
 
-        {!pacienteId && (
+        {fallo && (
+          <p
+            role="alert"
+            className="mx-auto mt-6 max-w-focus rounded-md bg-error-container/40 p-4 text-center text-body-sm text-alert-clinical"
+          >
+            {fallo}
+          </p>
+        )}
+
+        {!pacienteId && !fallo && (
           <p className="mt-6 text-center text-body-sm italic text-outline">
             Elige de quién es la sesión para poder guardar.
           </p>

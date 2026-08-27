@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import { Download, RotateCcw } from 'lucide-react'
-import { soles, useMirai } from '@/lib/store'
+import { simularSostenibilidad, soles, useMirai } from '@/lib/store'
 import { claveDia } from '@/lib/fecha'
 import {
   BotonPrimario,
@@ -21,6 +21,7 @@ export default function Ajustes() {
   const [confirmar, setConfirmar] = useState(false)
   const [descargando, setDescargando] = useState(false)
   const [falloDescarga, setFalloDescarga] = useState(null)
+  const [falloGuardado, setFalloGuardado] = useState(null)
 
   // Un respaldo que ella puede pedir sin depender de nadie. Sale como JSON
   // porque es lo que se puede volver a leer dentro de diez años.
@@ -49,15 +50,26 @@ export default function Ajustes() {
     setDatos(terapeuta)
   }, [terapeuta])
 
+  const proyeccion = simularSostenibilidad({
+    terapeuta: datos,
+    sesionesPorSemana: datos.sesiones_semanales_sostenibles,
+    tarifa: datos.tarifa_sesion,
+  })
+
   const cambiar = (campo, numerico = false) => (e) => {
     setDatos({ ...datos, [campo]: numerico ? Number(e.target.value) : e.target.value })
     setGuardado(false)
   }
 
-  const enviar = (e) => {
+  const enviar = async (e) => {
     e.preventDefault()
-    guardarAjustes(datos)
-    setGuardado(true)
+    setFalloGuardado(null)
+    try {
+      await guardarAjustes(datos)
+      setGuardado(true)
+    } catch (fallo) {
+      setFalloGuardado(fallo.message || 'No se pudieron guardar los ajustes.')
+    }
   }
 
   return (
@@ -144,9 +156,7 @@ export default function Ajustes() {
           </Campo>
           <p className="mt-4 text-body-sm italic leading-relaxed text-on-surface-variant">
             Con {datos.sesiones_semanales_sostenibles} sesiones a {soles(datos.tarifa_sesion)}, un
-            mes completo te deja alrededor de{' '}
-            {soles(datos.sesiones_semanales_sostenibles * datos.tarifa_sesion * 4 - datos.monthly_fixed_costs)}{' '}
-            después de gastos fijos.
+            mes completo te deja alrededor de {soles(proyeccion.neto)} después de gastos fijos.
           </p>
         </Tarjeta>
 
@@ -177,6 +187,11 @@ export default function Ajustes() {
         <div className="flex items-center gap-4">
           <BotonPrimario type="submit">Guardar ajustes</BotonPrimario>
           {guardado && <span className="text-body-sm italic text-secondary">Guardado.</span>}
+          {falloGuardado && (
+            <span role="alert" className="text-body-sm text-alert-clinical">
+              {falloGuardado}
+            </span>
+          )}
         </div>
       </form>
 

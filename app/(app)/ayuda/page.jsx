@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useMirai } from '@/lib/store'
 import { Encabezado, Rotulo, Tarjeta } from '@/components/ui'
 
 const RECORRIDO = [
@@ -43,6 +44,8 @@ const RECORRIDO = [
 ]
 
 export default function Ayuda() {
+  const { esMuestra } = useMirai()
+
   return (
     <div className="mx-auto w-full max-w-content px-margin-mobile py-10 md:px-margin-desktop">
       <Encabezado
@@ -50,10 +53,11 @@ export default function Ayuda() {
         bajada="Seis pantallas, una sola idea: que la administración no te robe la cabeza antes de entrar a sesión."
       />
 
+      <h2 className="sr-only">Recorrido por las pantallas</h2>
       <div className="grid gap-6 md:grid-cols-2">
         {RECORRIDO.map((r) => (
           <Tarjeta key={r.titulo}>
-            <h2 className="mb-3 font-serif text-headline-md text-primary">{r.titulo}</h2>
+            <h3 className="mb-3 font-serif text-headline-md text-primary">{r.titulo}</h3>
             <p className="mb-5 text-body-md leading-relaxed text-on-surface-variant">{r.texto}</p>
             <Link
               href={r.donde}
@@ -68,17 +72,36 @@ export default function Ayuda() {
 
       <div className="mt-12 max-w-3xl space-y-6">
         <Tarjeta className="bg-surface-container-low">
-          <Rotulo>En qué punto está esto</Rotulo>
-          <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
-            Esta es la versión navegable: todas las pantallas funcionan de verdad y los datos
-            persisten, pero viven en este navegador. No hay cuentas, no hay servidor y nada se
-            comparte. Sirve para usar el flujo completo antes de construir el backend.
-          </p>
-          <p className="text-body-md leading-relaxed text-on-surface-variant">
-            Lo que falta para trabajar con pacientes reales: cuentas con contraseña, base de datos
-            con aislamiento por terapeuta, cifrado de las notas y recordatorios de WhatsApp. Está
-            escrito en <code className="text-secondary">README.md</code> con el orden exacto.
-          </p>
+          <Rotulo>Dónde están tus datos</Rotulo>
+          {esMuestra ? (
+            <>
+              <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
+                Estás en la muestra. Todas las pantallas funcionan de verdad, pero lo que escribas
+                vive solo en este navegador: no hay cuenta ni servidor, y se pierde si limpias los
+                datos de navegación. Los pacientes que ves son inventados.
+              </p>
+              <p className="text-body-md leading-relaxed text-on-surface-variant">
+                Para trabajar con pacientes reales hace falta una cuenta. Desde ahí, cada terapeuta
+                ve solo lo suyo y las notas se guardan cifradas.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
+                Tus pacientes y tus notas viven en tu cuenta, aisladas de las de cualquier otra
+                terapeuta. Las notas clínicas se guardan cifradas: quien tuviera acceso a la base
+                de datos vería bytes, no lo que escribiste.
+              </p>
+              <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
+                Queda registrado quién abre cada historia y cuándo, y ese registro no se puede
+                editar ni borrar. También el tuyo.
+              </p>
+              <p className="text-body-md leading-relaxed text-on-surface-variant">
+                En Ajustes puedes descargar una copia de todo cuando quieras. Es tu historia
+                clínica, no la nuestra.
+              </p>
+            </>
+          )}
         </Tarjeta>
 
         <Tarjeta>

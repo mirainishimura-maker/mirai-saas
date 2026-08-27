@@ -129,7 +129,7 @@ function PerfilPaciente() {
         </div>
       </header>
 
-      <nav className="mb-8 flex gap-1 border-b border-border-mist">
+      <nav className="mb-8 flex gap-1 border-b border-border-mist" role="tablist">
         {[
           ['historia', 'Historia'],
           ['mapa', 'Mapa de alianza'],
@@ -137,6 +137,9 @@ function PerfilPaciente() {
         ].map(([valor, etiqueta]) => (
           <button
             key={valor}
+            type="button"
+            role="tab"
+            aria-selected={pestana === valor}
             onClick={() => setPestana(valor)}
             className={`-mb-px border-b-2 px-5 py-3 text-label-md uppercase transition-colors ${
               pestana === valor

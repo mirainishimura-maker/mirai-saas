@@ -6,10 +6,18 @@
 -- El cliente llama a guardar_nota() y leer_notas(); nunca hace select
 -- directo sobre raw_narrative_encrypted, que para él es un montón de bytes.
 --
--- Qué protege esto de verdad: si alguien se lleva una copia de la base de
--- datos —un respaldo perdido, un volcado mal guardado— se lleva bytes sin
--- sentido. No protege contra alguien que consiga la llave del Vault; por eso
--- la llave se guarda una sola vez y no se copia a ningún otro sitio.
+-- DOS COSAS QUE PARECEN DETALLE Y NO LO SON:
+--
+-- 1. `revoke ... from public`. Postgres concede EXECUTE a PUBLIC en toda
+--    función nueva, y los privilegios efectivos son la unión de los del rol
+--    y los de PUBLIC. Revocar solo de `anon` no quita nada. Como estas
+--    funciones viven en el esquema public, PostgREST las publica como RPC
+--    alcanzables con la llave anónima: sin revocar de PUBLIC, clave_notas()
+--    devolvería la llave de cifrado a cualquiera que la invoque.
+--
+-- 2. `set search_path = ''`. Fija la resolución de nombres, para que nadie
+--    pueda colar un objeto propio que suplante a una tabla o a una función.
+--    Obliga a cualificar todo con su esquema, que es justo lo que se quiere.
 --
 -- ANTES de ejecutar este archivo, crear la llave (una vez, en el SQL
 -- Editor, con una cadena larga y aleatoria que NO se guarde en el repo):
@@ -30,12 +38,14 @@ returns text
 language sql
 stable
 security definer
-set search_path = public, vault
+set search_path = ''
 as $$
     select decrypted_secret from vault.decrypted_secrets where name = 'mirai_clave_notas';
 $$;
 
-revoke all on function public.clave_notas() from anon, authenticated;
+-- La llave no la invoca nadie desde fuera: solo las funciones de abajo, que
+-- se ejecutan como su propietario y por eso no necesitan permiso explícito.
+revoke all on function public.clave_notas() from public, anon, authenticated;
 
 -- Guardar ─────────────────────────────────────────────────────────────
 create or replace function public.guardar_nota(
@@ -49,7 +59,7 @@ create or replace function public.guardar_nota(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
     v_terapeuta uuid := auth.uid();
@@ -79,7 +89,7 @@ begin
     )
     values (
         v_terapeuta, p_patient_id, p_fecha,
-        pgp_sym_encrypt(p_narrativa, public.clave_notas()),
+        extensions.pgp_sym_encrypt(p_narrativa, public.clave_notas()),
         p_modalidad, p_riesgo, p_tags
     )
     returning id into v_id;
@@ -109,14 +119,18 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
     v_terapeuta uuid := auth.uid();
+    v_clave text;
 begin
     if v_terapeuta is null then
         raise exception 'Hay que iniciar sesión para leer notas';
     end if;
+
+    -- Una sola lectura de la llave para toda la consulta, no una por fila.
+    v_clave := public.clave_notas();
 
     perform public.registrar_acceso('leer', null, p_patient_id);
 
@@ -125,7 +139,7 @@ begin
         s.id,
         s.patient_id,
         s.session_date,
-        pgp_sym_decrypt(s.raw_narrative_encrypted, public.clave_notas()),
+        extensions.pgp_sym_decrypt(s.raw_narrative_encrypted, v_clave),
         s.treatment_modality,
         s.inferred_risk_level,
         s.tags,
@@ -147,7 +161,7 @@ create or replace function public.editar_nota(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
     v_terapeuta uuid := auth.uid();
@@ -156,8 +170,14 @@ begin
         raise exception 'Hay que iniciar sesión';
     end if;
 
+    -- Igual que al crearla: editar una nota hasta dejarla vacía sería
+    -- borrar su contenido por la puerta de atrás.
+    if coalesce(trim(p_narrativa), '') = '' then
+        raise exception 'Una nota vacía no se guarda';
+    end if;
+
     update public.clinical_sessions
-    set raw_narrative_encrypted = pgp_sym_encrypt(p_narrativa, public.clave_notas()),
+    set raw_narrative_encrypted = extensions.pgp_sym_encrypt(p_narrativa, public.clave_notas()),
         inferred_risk_level = coalesce(p_riesgo, inferred_risk_level),
         tags = coalesce(p_tags, tags)
     where id = p_id and therapist_id = v_terapeuta;
@@ -178,10 +198,11 @@ create or replace function public.exportar_historia(p_patient_id uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
     v_terapeuta uuid := auth.uid();
+    v_clave text;
     v_salida jsonb;
 begin
     if v_terapeuta is null then
@@ -195,6 +216,8 @@ begin
         raise exception 'Ese paciente no es tuyo';
     end if;
 
+    v_clave := public.clave_notas();
+
     select jsonb_build_object(
         'exportado_el', now(),
         'paciente', to_jsonb(p) - 'therapist_id',
@@ -204,7 +227,7 @@ begin
                 'modalidad', s.treatment_modality,
                 'riesgo', s.inferred_risk_level,
                 'etiquetas', s.tags,
-                'narrativa', pgp_sym_decrypt(s.raw_narrative_encrypted, public.clave_notas())
+                'narrativa', extensions.pgp_sym_decrypt(s.raw_narrative_encrypted, v_clave)
             ) order by s.session_date)
             from public.clinical_sessions s where s.patient_id = p_patient_id
         ), '[]'::jsonb),
@@ -228,13 +251,17 @@ end;
 $$;
 
 -- Permisos ────────────────────────────────────────────────────────────
--- Solo con sesión iniciada, y nunca el rol anónimo.
-revoke all on function public.guardar_nota(uuid, text, varchar, varchar, text[], date) from anon;
-revoke all on function public.leer_notas(uuid) from anon;
-revoke all on function public.editar_nota(uuid, text, varchar, text[]) from anon;
-revoke all on function public.exportar_historia(uuid) from anon;
+-- Primero se le quita a PUBLIC (que es quien de verdad tiene el permiso
+-- por defecto) y solo después se concede a quien debe tenerlo.
+revoke all on function public.guardar_nota(uuid, text, varchar, varchar, text[], date)
+    from public, anon, authenticated;
+revoke all on function public.leer_notas(uuid) from public, anon, authenticated;
+revoke all on function public.editar_nota(uuid, text, varchar, text[])
+    from public, anon, authenticated;
+revoke all on function public.exportar_historia(uuid) from public, anon, authenticated;
 
-grant execute on function public.guardar_nota(uuid, text, varchar, varchar, text[], date) to authenticated;
+grant execute on function public.guardar_nota(uuid, text, varchar, varchar, text[], date)
+    to authenticated;
 grant execute on function public.leer_notas(uuid) to authenticated;
 grant execute on function public.editar_nota(uuid, text, varchar, text[]) to authenticated;
 grant execute on function public.exportar_historia(uuid) to authenticated;

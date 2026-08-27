@@ -86,12 +86,33 @@ create policy "terapeuta gestiona su agenda"
     );
 
 -- Movimientos ─────────────────────────────────────────────────────────
+-- Además del dueño, se exige que el paciente y la cita referidos sean
+-- suyos. Sin esto, una terapeuta podría crear un movimiento propio
+-- apuntando a la cita de otra: como idx_cobro_unico_por_cita es único y
+-- global, esa fila ocuparía el hueco y le bloquearía el cobro legítimo a
+-- la otra.
 drop policy if exists "terapeuta gestiona sus movimientos" on public.financial_transactions;
 create policy "terapeuta gestiona sus movimientos"
     on public.financial_transactions for all
     to authenticated
     using (auth.uid() = therapist_id)
-    with check (auth.uid() = therapist_id);
+    with check (
+        auth.uid() = therapist_id
+        and (
+            patient_id is null
+            or exists (
+                select 1 from public.patients p
+                where p.id = patient_id and p.therapist_id = auth.uid()
+            )
+        )
+        and (
+            appointment_id is null
+            or exists (
+                select 1 from public.appointments a
+                where a.id = appointment_id and a.therapist_id = auth.uid()
+            )
+        )
+    );
 
 -- Mapas ───────────────────────────────────────────────────────────────
 drop policy if exists "terapeuta gestiona sus mapas" on public.alliance_maps;

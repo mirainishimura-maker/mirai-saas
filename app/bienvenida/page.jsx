@@ -132,7 +132,7 @@ function LienzoIlustrado() {
           Aparece por primera vez la conexión entre la ansiedad de esta semana y la expectativa
           familiar no dicha.
         </p>
-        <p className="text-outline-variant">|</p>
+        <p aria-hidden="true" className="text-outline-variant">|</p>
       </div>
       <div className="mt-8 flex items-center gap-3 border-t border-border-mist pt-6">
         <span className="h-8 w-8 rounded-full border-2 border-secondary-fixed" />

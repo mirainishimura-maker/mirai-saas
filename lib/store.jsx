@@ -89,10 +89,21 @@ export function MiraiProvider({ children }) {
   // Cerrar sesión en otra pestaña tiene que cerrarla acá también.
   useEffect(() => {
     if (!hayNube) return
-    const { data } = supabase().auth.onAuthStateChange((evento) => {
+    const { data } = supabase().auth.onAuthStateChange(async (evento) => {
       if (evento === 'SIGNED_OUT') {
         setEstado(VACIO)
         setModo('sin-sesion')
+        return
+      }
+      if (evento === 'SIGNED_IN' && modoRef.current !== 'nube') {
+        try {
+          const cargado = await nube.cargarTodo()
+          setEstado(cargado)
+          setModo('nube')
+        } catch (e) {
+          console.error('Mirai · entrando:', e)
+          setError(e.message)
+        }
       }
     })
     return () => data.subscription.unsubscribe()
@@ -194,6 +205,7 @@ export function MiraiProvider({ children }) {
           patient_id: cita.patient_id,
           dia: cita.dia,
         })
+
         await recargar()
       },
 
@@ -218,8 +230,16 @@ export function MiraiProvider({ children }) {
       },
 
       async guardarMapa(pacienteId, contenido) {
+        const previo = estadoActual().mapas[pacienteId]
+        // El mapa se arrastra: la pantalla va por delante para que no dé
+        // tirones, pero si la escritura falla se vuelve a lo último bueno.
         setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: contenido } }))
-        await a().guardarMapa(pacienteId, contenido)
+        try {
+          await a().guardarMapa(pacienteId, contenido)
+        } catch (fallo) {
+          setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: previo } }))
+          throw fallo
+        }
       },
 
       async marcarPendientesLeidos() {
@@ -426,6 +446,14 @@ export function calcularOxigeno({ transacciones, citas, terapeuta }) {
   const carga = Math.round((sesionesSemana / techo) * 100)
   const sesionesParaLaMeta = Math.max(0, Math.ceil((meta - neto) / tarifa))
 
+  // Lo que lee el árbol: frutos son sesiones cobradas y raíces el fondo
+  // semilla frente al que tocaría en un mes que cumple la meta.
+  const sesionesCobradas = delMes.filter(
+    (x) => x.transaction_type === 'Income' && x.category === 'Sesión',
+  ).length
+  const semillaObjetivo = (meta * porcentajeSemilla) / 100
+  const raices = semillaObjetivo > 0 ? Math.min(100, (semilla / semillaObjetivo) * 100) : 0
+
   const serie = []
   for (let i = 7; i >= 0; i--) {
     const desde = sumarDias(lunes, -7 * i)
@@ -449,6 +477,8 @@ export function calcularOxigeno({ transacciones, citas, terapeuta }) {
     carga,
     cargaTexto: textoDeCarga(carga),
     sesionesParaLaMeta,
+    sesionesCobradas,
+    raices,
     techo,
     serie,
     movimientos: [...delMes].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)),

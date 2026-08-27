@@ -28,7 +28,15 @@ export async function middleware(request) {
 
   // getUser() y no getSession(): este valida el token contra Supabase en vez
   // de creerse lo que traiga la cookie.
-  await supabase.auth.getUser()
+  //
+  // Si Supabase no responde, la petición sigue: quedarse sin refrescar el
+  // token es molesto, pero tumbar la navegación entera por una caída de red
+  // es peor. Quien decide si hay sesión es la app, no este middleware.
+  try {
+    await supabase.auth.getUser()
+  } catch (fallo) {
+    console.error('Mirai · refrescando la sesión:', fallo)
+  }
 
   return respuesta
 }
