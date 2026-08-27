@@ -198,7 +198,11 @@ function Calendario() {
         crear={(datos) => {
           const cita = crearCita(datos)
           if (!cita) return false
-          setDia(desdeClave(datos.dia))
+          const cuando = desdeClave(datos.dia)
+          setDia(cuando)
+          // Si la cita cae en otro mes, el calendario tiene que viajar con
+          // ella: si no, se agenda algo que no aparece en pantalla.
+          setMesVisible(new Date(cuando.getFullYear(), cuando.getMonth(), 1))
           setVista('dia')
           return true
         }}
@@ -506,9 +510,18 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
     })
   }
 
-  // Misma regla que aplica lib/store.jsx al guardar: una sesión que termina
-  // antes de empezar no se agenda. Acá solo se avisa antes de intentarlo.
+  // Misma regla que aplica lib/store.jsx al guardar; acá solo se avisa antes
+  // de intentarlo, y se dice cuál de las tres condiciones falta.
   const valida = citaValida(datos)
+  const problema = !datos.patient_id
+    ? 'Elige de quién es la sesión.'
+    : !datos.dia
+      ? 'Falta el día de la sesión.'
+      : !datos.inicio || !datos.fin
+        ? 'Faltan las horas de inicio y fin.'
+        : !valida
+          ? 'La sesión tiene que terminar después de empezar.'
+          : null
 
   const enviar = (e) => {
     e.preventDefault()
@@ -541,9 +554,9 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
           </Campo>
         </div>
 
-        {!valida && (
+        {problema && (
           <p role="alert" className="text-body-sm text-alert-clinical">
-            La sesión tiene que terminar después de empezar.
+            {problema}
           </p>
         )}
 

@@ -71,6 +71,11 @@ function LienzoDeEnfoque() {
   // escribe desde un manejador, nunca durante el render: React puede descartar
   // un render y dejar en la ref algo que nunca llegó a pantalla.
   const congelado = useRef(null)
+  const salida = useRef(null)
+
+  // Si sales del lienzo en el instante entre guardar y redirigir, la
+  // navegación pendiente no debe arrastrarte después a otra pantalla.
+  useEffect(() => () => clearTimeout(salida.current), [])
 
   const confirmar = useCallback(
     (datos) => {
@@ -87,7 +92,7 @@ function LienzoDeEnfoque() {
           .filter(Boolean),
       })
       setFase('guardada')
-      setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
+      salida.current = setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
     },
     [guardarNota, router],
   )
