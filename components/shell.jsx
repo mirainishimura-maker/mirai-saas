@@ -32,7 +32,7 @@ const RUTAS = [
 ]
 
 export default function Shell({ children }) {
-  const { terapeuta, citas, alternarModoCalma } = useMirai()
+  const { terapeuta, citas, alternarModoCalma, cerrarSesion, esMuestra } = useMirai()
   const ruta = usePathname()
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [pendientesAbierto, setPendientesAbierto] = useState(false)
@@ -68,7 +68,9 @@ export default function Shell({ children }) {
         <div className="mb-8 flex items-center gap-3">
           <Marca />
           <div className="min-w-0">
-            <p className="font-serif text-headline-md leading-tight text-secondary">Mirai</p>
+            <p className="truncate font-serif text-headline-md leading-tight text-secondary">
+              {terapeuta?.full_name?.trim() || 'Mirai'}
+            </p>
             <p className="text-body-sm text-on-surface-variant">
               {delDia.length === 0
                 ? 'Hoy sin sesiones'
@@ -114,13 +116,16 @@ export default function Shell({ children }) {
               <HelpCircle size={16} strokeWidth={1.6} />
               <span className="text-label-md uppercase">Ayuda</span>
             </Link>
-            <Link
-              href="/bienvenida"
-              className="flex items-center gap-3 rounded-md px-4 py-2 text-on-surface-variant transition-all hover:bg-surface-variant/50"
+            <button
+              type="button"
+              onClick={cerrarSesion}
+              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-on-surface-variant transition-all hover:bg-surface-variant/50"
             >
               <LogOut size={16} strokeWidth={1.6} />
-              <span className="text-label-md uppercase">Cerrar sesión</span>
-            </Link>
+              <span className="text-label-md uppercase">
+                {esMuestra ? 'Salir de la muestra' : 'Cerrar sesión'}
+              </span>
+            </button>
           </div>
         </div>
       </aside>
@@ -135,7 +140,7 @@ export default function Shell({ children }) {
       )}
 
       <div className="lg:ml-64">
-        <AvisoMuestra />
+        {esMuestra && <AvisoMuestra />}
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border-mist bg-bg-warm/90 px-margin-mobile py-4 backdrop-blur-sm md:px-margin-desktop">
           <div className="flex items-center gap-4">
             <button
@@ -155,9 +160,9 @@ export default function Shell({ children }) {
             <button
               type="button"
               onClick={alternarModoCalma}
-              aria-pressed={terapeuta.modo_calma}
+              aria-pressed={Boolean(terapeuta?.modo_calma)}
               className={`rounded-full px-4 py-2 text-label-md uppercase transition-colors ${
-                terapeuta.modo_calma
+                terapeuta?.modo_calma
                   ? 'bg-secondary-fixed text-on-secondary-fixed'
                   : 'text-on-surface-variant hover:text-primary'
               }`}

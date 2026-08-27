@@ -1,288 +1,279 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import * as seed from './seed'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import * as local from './adaptador-local'
+import * as nube from './adaptador-nube'
+import { hayNube, supabase } from './supabase/navegador'
 import { claveDia, desdeClave, hoy, inicioSemana, sumarDias } from './fecha'
 
 // ─────────────────────────────────────────────────────────────────────
-// Capa de datos. Hoy vive en el navegador (localStorage); mañana vive en
-// Supabase. Toda la app consume ÚNICAMENTE lo que expone useMirai():
-// ninguna pantalla sabe de dónde salen los datos. Para migrar, se
-// reemplazan las funciones de este archivo por llamadas a Supabase y no
-// se toca ni una pantalla.
+// El único sitio del que las pantallas sacan datos. Por debajo hay dos
+// adaptadores con la misma forma:
+//
+//   nube    → Supabase. Datos reales, cuenta propia, notas cifradas.
+//   muestra → localStorage. Datos inventados, para recorrer Mirai sin cuenta.
+//
+// Ninguna pantalla sabe cuál está activo, y esa es toda la gracia: cuando
+// una terapeuta inicia sesión, las nueve pantallas empiezan a hablar con
+// Postgres sin que se les haya tocado una línea.
 // ─────────────────────────────────────────────────────────────────────
 
-const LLAVE = 'mirai.demo.v1'
-
-const estadoInicial = () => ({
-  terapeuta: seed.terapeuta,
-  pacientes: seed.pacientes,
-  sesiones: seed.sesiones,
-  citas: seed.citas,
-  transacciones: seed.transacciones,
-  mapas: seed.mapas,
-  pendientes: seed.pendientes,
-})
+const LLAVE_MUESTRA = 'mirai.modo-muestra'
 
 const MiraiContext = createContext(null)
 
-function id(prefijo) {
-  return prefijo + '-' + Math.random().toString(36).slice(2, 9)
-}
-
-const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/
-
-/** Minutos desde medianoche, o null si la hora no es una hora. */
-export function minutosDelDia(hhmm) {
-  if (typeof hhmm !== 'string' || !HORA.test(hhmm)) return null
-  const [h, m] = hhmm.split(':').map(Number)
-  return h * 60 + m
-}
-
-/** Una cita necesita paciente, día y un intervalo que avance en el tiempo. */
-export function citaValida(datos) {
-  if (!datos?.patient_id || !datos?.dia) return false
-  const inicio = minutosDelDia(datos.inicio)
-  const fin = minutosDelDia(datos.fin)
-  return inicio !== null && fin !== null && fin > inicio
-}
-
-/** Un número utilizable, o el de reserva. Un campo vaciado llega como '' o NaN. */
-function numeroSeguro(valor, reserva, minimo = 0) {
-  const n = Number(valor)
-  if (!Number.isFinite(n) || n < minimo) return reserva
-  return n
-}
-
-/**
- * Los ajustes son divisores de medio panel: si la tarifa o el techo de sesiones
- * quedan en cero, la carga semanal sale Infinity y el mes "cubierto" sale NaN.
- * Se sanean acá, al entrar, y no en cada pantalla que los usa.
- */
-function sanearTerapeuta(t) {
-  return {
-    ...t,
-    tarifa_sesion: numeroSeguro(t.tarifa_sesion, 75, 1),
-    target_salary_monthly: numeroSeguro(t.target_salary_monthly, 0),
-    monthly_fixed_costs: numeroSeguro(t.monthly_fixed_costs, 0),
-    sesiones_semanales_sostenibles: numeroSeguro(t.sesiones_semanales_sostenibles, 20, 1),
-    porcentaje_semilla: Math.min(100, numeroSeguro(t.porcentaje_semilla, 10)),
-  }
+const VACIO = {
+  terapeuta: null,
+  pacientes: [],
+  sesiones: [],
+  citas: [],
+  transacciones: [],
+  mapas: {},
+  pendientes: [],
 }
 
 export function MiraiProvider({ children }) {
-  const [estado, setEstado] = useState(estadoInicial)
-  const [hidratado, setHidratado] = useState(false)
+  const [modo, setModo] = useState('cargando') // cargando | nube | muestra | sin-sesion
+  const [estado, setEstado] = useState(VACIO)
+  const [error, setError] = useState(null)
 
+  const adaptador = modo === 'nube' ? nube : local
+  const adaptadorRef = useRef(adaptador)
+  adaptadorRef.current = adaptador
+
+  // Arranque: manda la sesión de Supabase. Si no hay, se mira si la persona
+  // pidió expresamente ver la muestra. Si tampoco, no hay datos que enseñar.
   useEffect(() => {
-    try {
-      const crudo = window.localStorage.getItem(LLAVE)
-      if (crudo) {
-        const guardado = { ...estadoInicial(), ...JSON.parse(crudo) }
-        // Lo guardado puede venir de una versión anterior de la app: se sanea
-        // al entrar para que ninguna pantalla tenga que defenderse sola.
-        guardado.terapeuta = sanearTerapeuta(guardado.terapeuta || {})
-        guardado.pendientes = (guardado.pendientes || []).filter((p) => p?.payload?.texto)
-        setEstado(guardado)
+    let vivo = true
+
+    async function arrancar() {
+      try {
+        if (hayNube) {
+          const { data } = await supabase().auth.getSession()
+          if (data?.session) {
+            const cargado = await nube.cargarTodo()
+            if (!vivo) return
+            setEstado(cargado)
+            setModo('nube')
+            return
+          }
+        }
+
+        const quiereMuestra =
+          !hayNube || window.localStorage.getItem(LLAVE_MUESTRA) === '1'
+
+        if (quiereMuestra) {
+          const cargado = await local.cargarTodo()
+          if (!vivo) return
+          setEstado(cargado)
+          setModo('muestra')
+          return
+        }
+
+        if (vivo) setModo('sin-sesion')
+      } catch (e) {
+        console.error('Mirai · arrancando:', e)
+        if (vivo) {
+          setError(e.message)
+          setModo('sin-sesion')
+        }
       }
-    } catch {
-      // Si el guardado local está corrupto o bloqueado, seguimos con la semilla.
     }
-    setHidratado(true)
+
+    arrancar()
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  // Cerrar sesión en otra pestaña tiene que cerrarla acá también.
+  useEffect(() => {
+    if (!hayNube) return
+    const { data } = supabase().auth.onAuthStateChange((evento) => {
+      if (evento === 'SIGNED_OUT') {
+        setEstado(VACIO)
+        setModo('sin-sesion')
+      }
+    })
+    return () => data.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (!hidratado) return
-    try {
-      window.localStorage.setItem(LLAVE, JSON.stringify(estado))
-    } catch {
-      // Modo incógnito o cuota llena: la app sigue funcionando en memoria.
-    }
-  }, [estado, hidratado])
-
-  // Modo Calma vive en el <html> para poder desaturar toda la interfaz.
-  useEffect(() => {
+    if (!estado.terapeuta) return
     document.documentElement.dataset.calma = estado.terapeuta.modo_calma ? 'on' : 'off'
-  }, [estado.terapeuta.modo_calma])
+  }, [estado.terapeuta])
+
+  const recargar = useCallback(async () => {
+    const cargado = await adaptadorRef.current.cargarTodo()
+    setEstado(cargado)
+  }, [])
 
   const acciones = useMemo(() => {
-    const actualizar = (parcial) => setEstado((e) => ({ ...e, ...parcial }))
+    // Cada acción escribe primero donde toque y luego refleja el cambio en
+    // pantalla. Si la escritura falla, la pantalla no miente: se queda como
+    // estaba y el error sube.
+    const a = () => adaptadorRef.current
 
     return {
-      guardarAjustes(cambios) {
-        setEstado((e) => ({ ...e, terapeuta: sanearTerapeuta({ ...e.terapeuta, ...cambios }) }))
+      async guardarAjustes(cambios) {
+        const terapeuta = await a().guardarAjustes(sanearTerapeuta(cambios))
+        setEstado((e) => ({ ...e, terapeuta: { ...e.terapeuta, ...terapeuta } }))
       },
 
-      alternarModoCalma() {
-        setEstado((e) => ({
-          ...e,
-          terapeuta: { ...e.terapeuta, modo_calma: !e.terapeuta.modo_calma },
-        }))
+      async alternarModoCalma() {
+        const valor = !estadoActual().terapeuta?.modo_calma
+        const terapeuta = await a().guardarAjustes({ modo_calma: valor })
+        setEstado((e) => ({ ...e, terapeuta: { ...e.terapeuta, ...terapeuta } }))
       },
 
-      crearPaciente(datos) {
-        const nuevo = {
-          id: id('p'),
-          first_name: '',
-          last_name: '',
-          email: '',
-          phone_number: '',
-          date_of_birth: '',
-          alliance_status: 'Rapport',
-          treatment_modality: 'TCC',
-          frecuencia: 'Semanal',
-          inferred_risk_level: 'Low',
-          motivo: '',
-          notes: '',
-          created_at: claveDia(new Date()),
-          ...datos,
-        }
+      async crearPaciente(datos) {
+        const nuevo = await a().crearPaciente(datos)
         setEstado((e) => ({ ...e, pacientes: [nuevo, ...e.pacientes] }))
         return nuevo
       },
 
-      actualizarPaciente(pacienteId, cambios) {
+      async actualizarPaciente(id, cambios) {
+        await a().actualizarPaciente(id, cambios)
         setEstado((e) => ({
           ...e,
-          pacientes: e.pacientes.map((p) => (p.id === pacienteId ? { ...p, ...cambios } : p)),
+          pacientes: e.pacientes.map((p) => (p.id === id ? { ...p, ...cambios } : p)),
         }))
       },
 
-      eliminarPaciente(pacienteId) {
+      async archivarPaciente(id) {
+        await a().archivarPaciente(id)
         setEstado((e) => ({
           ...e,
-          pacientes: e.pacientes.filter((p) => p.id !== pacienteId),
-          sesiones: e.sesiones.filter((s) => s.patient_id !== pacienteId),
-          citas: e.citas.filter((c) => c.patient_id !== pacienteId),
+          pacientes: e.pacientes.filter((p) => p.id !== id),
+          sesiones: e.sesiones.filter((s) => s.patient_id !== id),
+          citas: e.citas.filter((c) => c.patient_id !== id),
         }))
       },
 
-      guardarNota({ patient_id, raw_narrative, treatment_modality, inferred_risk_level, tags, session_date }) {
-        const nota = {
-          id: id('s'),
-          patient_id,
-          session_date: session_date || claveDia(new Date()),
-          raw_narrative: raw_narrative || '',
-          treatment_modality: treatment_modality || 'TCC',
-          inferred_risk_level: inferred_risk_level || 'Low',
-          tags: tags || [],
-          is_completed: true,
-        }
-        setEstado((e) => {
-          const pacientes =
-            inferred_risk_level === 'High'
+      async guardarNota(datos) {
+        const nota = await a().guardarNota(datos)
+        setEstado((e) => ({
+          ...e,
+          sesiones: [nota, ...e.sesiones],
+          pacientes:
+            nota.inferred_risk_level === 'High'
               ? e.pacientes.map((p) =>
-                  p.id === patient_id ? { ...p, inferred_risk_level: 'High' } : p,
+                  p.id === nota.patient_id ? { ...p, inferred_risk_level: 'High' } : p,
                 )
-              : e.pacientes
-          return { ...e, sesiones: [nota, ...e.sesiones], pacientes }
-        })
+              : e.pacientes,
+        }))
         return nota
       },
 
-      eliminarNota(notaId) {
-        setEstado((e) => ({ ...e, sesiones: e.sesiones.filter((s) => s.id !== notaId) }))
+      async editarNota(id, cambios) {
+        await a().editarNota(id, cambios)
+        setEstado((e) => ({
+          ...e,
+          sesiones: e.sesiones.map((s) => (s.id === id ? { ...s, ...cambios } : s)),
+        }))
       },
 
-      crearCita(datos) {
-        // La invariante vive acá, no solo en el formulario: una cita que
-        // termina antes de empezar descuadra el día entero y se persiste igual.
+      async eliminarNota(id) {
+        await a().eliminarNota(id)
+        setEstado((e) => ({ ...e, sesiones: e.sesiones.filter((s) => s.id !== id) }))
+      },
+
+      async crearCita(datos) {
         if (!citaValida(datos)) return null
-        const cita = {
-          id: id('c'),
-          status: 'Scheduled',
-          modalidad: 'Presencial',
-          intensidad: 'Normal',
-          foco: '',
-          ...datos,
-        }
+        const cita = await a().crearCita(datos)
         setEstado((e) => ({ ...e, citas: [...e.citas, cita] }))
         return cita
       },
 
-      cambiarEstadoCita(citaId, status) {
-        setEstado((e) => {
-          const cita = e.citas.find((c) => c.id === citaId)
-          const citas = e.citas.map((c) => (c.id === citaId ? { ...c, status } : c))
-          const cobroId = 'ing-' + citaId
-
-          // Atender una sesión genera su ingreso. Es la regla que sostiene
-          // el panel de Oxígeno Clínico: se cobra lo atendido, no lo agendado.
-          if (status === 'Completed' && cita) {
-            const yaCobrada = e.transacciones.some((t) => t.id === cobroId)
-            if (yaCobrada) return { ...e, citas }
-            return {
-              ...e,
-              citas,
-              transacciones: [
-                {
-                  id: cobroId,
-                  patient_id: cita.patient_id,
-                  amount: e.terapeuta.tarifa_sesion,
-                  transaction_type: 'Income',
-                  category: 'Sesión',
-                  transaction_date: cita.dia,
-                },
-                ...e.transacciones,
-              ],
-            }
-          }
-
-          // Y dejar de estar atendida lo revierte: si no, marcar por error una
-          // sesión como atendida deja plata que nunca entró en el panel.
-          return {
-            ...e,
-            citas,
-            transacciones: e.transacciones.filter((t) => t.id !== cobroId),
-          }
+      async cambiarEstadoCita(citaId, status) {
+        const actual = estadoActual()
+        const cita = actual.citas.find((c) => c.id === citaId)
+        if (!cita) return
+        await a().cambiarEstadoCita(citaId, status, {
+          tarifa: actual.terapeuta.tarifa_sesion,
+          patient_id: cita.patient_id,
+          dia: cita.dia,
         })
+        await recargar()
       },
 
-      eliminarCita(citaId) {
+      async eliminarCita(citaId) {
+        await a().eliminarCita(citaId)
         setEstado((e) => ({
           ...e,
           citas: e.citas.filter((c) => c.id !== citaId),
-          transacciones: e.transacciones.filter((t) => t.id !== 'ing-' + citaId),
+          transacciones: e.transacciones.filter((t) => t.appointment_id !== citaId),
         }))
       },
 
-      registrarMovimiento(datos) {
-        const mov = {
-          id: id('t'),
-          patient_id: null,
-          transaction_date: claveDia(new Date()),
-          ...datos,
-        }
+      async registrarMovimiento(datos) {
+        const mov = await a().registrarMovimiento(datos)
         setEstado((e) => ({ ...e, transacciones: [mov, ...e.transacciones] }))
         return mov
       },
 
-      eliminarMovimiento(movId) {
-        setEstado((e) => ({ ...e, transacciones: e.transacciones.filter((t) => t.id !== movId) }))
+      async eliminarMovimiento(id) {
+        await a().eliminarMovimiento(id)
+        setEstado((e) => ({ ...e, transacciones: e.transacciones.filter((t) => t.id !== id) }))
       },
 
-      guardarMapa(pacienteId, mapa) {
-        setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: mapa } }))
+      async guardarMapa(pacienteId, contenido) {
+        setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: contenido } }))
+        await a().guardarMapa(pacienteId, contenido)
       },
 
-      marcarPendientesLeidos() {
-        setEstado((e) => ({
-          ...e,
-          pendientes: e.pendientes.map((p) => ({ ...p, read: true })),
-        }))
+      async marcarPendientesLeidos() {
+        await a().marcarPendientesLeidos()
+        setEstado((e) => ({ ...e, pendientes: e.pendientes.map((p) => ({ ...p, read: true })) }))
       },
 
-      reiniciarDemo() {
-        const limpio = estadoInicial()
-        actualizar(limpio)
-        try {
-          window.localStorage.removeItem(LLAVE)
-        } catch {}
+      exportarHistoria: (id) => a().exportarHistoria(id),
+      exportarTodo: () => a().exportarTodo(),
+
+      async cerrarSesion() {
+        if (modoActual() === 'nube') {
+          await nube.cerrarSesion()
+        } else {
+          try {
+            window.localStorage.removeItem(LLAVE_MUESTRA)
+          } catch {}
+        }
+        setEstado(VACIO)
+        setModo('sin-sesion')
       },
+
+      reiniciarMuestra() {
+        setEstado(local.reiniciar())
+      },
+
+      recargar,
     }
-  }, [])
+  }, [recargar])
 
-  const valor = useMemo(() => ({ ...estado, hidratado, ...acciones }), [estado, hidratado, acciones])
+  // Las acciones se crean una vez; para leer lo último sin recrearlas, se
+  // consultan estas dos referencias.
+  const estadoRef = useRef(estado)
+  estadoRef.current = estado
+  const modoRef = useRef(modo)
+  modoRef.current = modo
+  function estadoActual() {
+    return estadoRef.current
+  }
+  function modoActual() {
+    return modoRef.current
+  }
+
+  const valor = useMemo(
+    () => ({
+      ...estado,
+      modo,
+      error,
+      esMuestra: modo === 'muestra',
+      listo: modo === 'nube' || modo === 'muestra',
+      ...acciones,
+    }),
+    [estado, modo, error, acciones],
+  )
 
   return <MiraiContext.Provider value={valor}>{children}</MiraiContext.Provider>
 }
@@ -293,21 +284,65 @@ export function useMirai() {
   return ctx
 }
 
+/** Entrar a la muestra sin cuenta. */
+export function activarMuestra() {
+  try {
+    window.localStorage.setItem(LLAVE_MUESTRA, '1')
+  } catch {}
+}
+
+// ── Reglas del negocio ───────────────────────────────────────────────
+
+const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+export function minutosDelDia(hhmm) {
+  if (typeof hhmm !== 'string' || !HORA.test(hhmm)) return null
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+export function citaValida(datos) {
+  if (!datos?.patient_id || !datos?.dia) return false
+  const inicio = minutosDelDia(datos.inicio)
+  const fin = minutosDelDia(datos.fin)
+  return inicio !== null && fin !== null && fin > inicio
+}
+
+function numeroSeguro(valor, reserva, minimo = 0) {
+  const n = Number(valor)
+  if (!Number.isFinite(n) || n < minimo) return reserva
+  return n
+}
+
+/**
+ * Los ajustes son divisores de medio panel: si la tarifa o el techo de
+ * sesiones quedan en cero, la carga semanal sale Infinity y el mes
+ * "cubierto" sale NaN. Se sanean acá, al entrar, y no en cada pantalla.
+ */
+function sanearTerapeuta(t) {
+  const salida = { ...t }
+  if ('tarifa_sesion' in t) salida.tarifa_sesion = numeroSeguro(t.tarifa_sesion, 75, 1)
+  if ('target_salary_monthly' in t)
+    salida.target_salary_monthly = numeroSeguro(t.target_salary_monthly, 0)
+  if ('monthly_fixed_costs' in t)
+    salida.monthly_fixed_costs = numeroSeguro(t.monthly_fixed_costs, 0)
+  if ('sesiones_semanales_sostenibles' in t)
+    salida.sesiones_semanales_sostenibles = numeroSeguro(t.sesiones_semanales_sostenibles, 20, 1)
+  if ('porcentaje_semilla' in t)
+    salida.porcentaje_semilla = Math.min(100, numeroSeguro(t.porcentaje_semilla, 10))
+  return salida
+}
+
 // ── Selectores ───────────────────────────────────────────────────────
 
 export function nombrePaciente(p) {
   if (!p) return 'Paciente'
-  return `${p.first_name} ${p.last_name}`.trim()
-}
-
-export function nombreCorto(p) {
-  if (!p) return '—'
-  return `${p.first_name} ${p.last_name ? p.last_name.charAt(0) + '.' : ''}`.trim()
+  return `${p.first_name} ${p.last_name || ''}`.trim()
 }
 
 export function iniciales(p) {
   if (!p) return '··'
-  return `${p.first_name.charAt(0)}${p.last_name.charAt(0) || ''}`.toUpperCase()
+  return `${(p.first_name || '?').charAt(0)}${(p.last_name || '').charAt(0)}`.toUpperCase()
 }
 
 export const FASES = [
@@ -340,17 +375,16 @@ export function proximaCita(citas, pacienteId) {
 export function sesionesDe(sesiones, pacienteId) {
   return sesiones
     .filter((s) => s.patient_id === pacienteId)
-    .sort((a, b) => b.session_date.localeCompare(a.session_date))
+    .sort((a, b) => String(b.session_date).localeCompare(String(a.session_date)))
 }
 
 export function ultimaNota(sesiones, pacienteId) {
   return sesionesDe(sesiones, pacienteId)[0]
 }
 
-/** Primeras ~28 palabras de la nota, para las tarjetas del directorio. */
 export function resumenNota(nota) {
   if (!nota) return null
-  const limpio = nota.raw_narrative.replace(/\s+/g, ' ').trim()
+  const limpio = (nota.raw_narrative || '').replace(/\s+/g, ' ').trim()
   const palabras = limpio.split(' ')
   return palabras.length > 28 ? palabras.slice(0, 28).join(' ') + '…' : limpio
 }
@@ -363,44 +397,43 @@ export function sesionesEnRango(citas, desde, hasta) {
 
 /** Todo lo que necesita el panel de Oxígeno Clínico, calculado en un solo lugar. */
 export function calcularOxigeno({ transacciones, citas, terapeuta }) {
+  const t = terapeuta || {}
   const hoyD = hoy()
-  const primeroDelMes = new Date(hoyD.getFullYear(), hoyD.getMonth(), 1)
-  const claveMes = claveDia(primeroDelMes)
+  const claveMes = claveDia(new Date(hoyD.getFullYear(), hoyD.getMonth(), 1))
   const claveHoy = claveDia(hoyD)
 
-  const delMes = transacciones.filter(
-    (t) => t.transaction_date >= claveMes && t.transaction_date <= claveHoy,
+  const delMes = (transacciones || []).filter(
+    (x) => x.transaction_date >= claveMes && x.transaction_date <= claveHoy,
   )
   const ingresos = delMes
-    .filter((t) => t.transaction_type === 'Income')
-    .reduce((s, t) => s + Number(t.amount), 0)
+    .filter((x) => x.transaction_type === 'Income')
+    .reduce((s, x) => s + Number(x.amount), 0)
   const egresos = delMes
-    .filter((t) => t.transaction_type === 'Expense')
-    .reduce((s, t) => s + Number(t.amount), 0)
+    .filter((x) => x.transaction_type === 'Expense')
+    .reduce((s, x) => s + Number(x.amount), 0)
 
   const neto = ingresos - egresos
   const margen = ingresos > 0 ? Math.round((neto / ingresos) * 100) : 0
-  const semilla = Math.round((neto > 0 ? neto : 0) * (terapeuta.porcentaje_semilla / 100))
-  const meta = terapeuta.target_salary_monthly
+  const porcentajeSemilla = numeroSeguro(t.porcentaje_semilla, 10)
+  const semilla = Math.round((neto > 0 ? neto : 0) * (porcentajeSemilla / 100))
+  const meta = numeroSeguro(t.target_salary_monthly, 0)
   const avanceMeta = meta > 0 ? Math.min(100, Math.round((neto / meta) * 100)) : 0
 
-  const techo = numeroSeguro(terapeuta.sesiones_semanales_sostenibles, 20, 1)
-  const tarifa = numeroSeguro(terapeuta.tarifa_sesion, 75, 1)
+  const techo = numeroSeguro(t.sesiones_semanales_sostenibles, 20, 1)
+  const tarifa = numeroSeguro(t.tarifa_sesion, 75, 1)
   const lunes = inicioSemana(hoyD)
-  const sesionesSemana = sesionesEnRango(citas, lunes, sumarDias(lunes, 6)).length
+  const sesionesSemana = sesionesEnRango(citas || [], lunes, sumarDias(lunes, 6)).length
   const carga = Math.round((sesionesSemana / techo) * 100)
   const sesionesParaLaMeta = Math.max(0, Math.ceil((meta - neto) / tarifa))
 
-  // Últimas 8 semanas de ingresos, para la curva.
   const serie = []
   for (let i = 7; i >= 0; i--) {
-    const desde = sumarDias(inicioSemana(hoyD), -7 * i)
-    const hasta = sumarDias(desde, 6)
+    const desde = sumarDias(lunes, -7 * i)
     const a = claveDia(desde)
-    const b = claveDia(hasta)
-    const monto = transacciones
-      .filter((t) => t.transaction_type === 'Income' && t.transaction_date >= a && t.transaction_date <= b)
-      .reduce((s, t) => s + Number(t.amount), 0)
+    const b = claveDia(sumarDias(desde, 6))
+    const monto = (transacciones || [])
+      .filter((x) => x.transaction_type === 'Income' && x.transaction_date >= a && x.transaction_date <= b)
+      .reduce((s, x) => s + Number(x.amount), 0)
     serie.push({ desde, monto })
   }
 
@@ -422,8 +455,6 @@ export function calcularOxigeno({ transacciones, citas, terapeuta }) {
   }
 }
 
-// Los umbrales de cuándo una semana está cargada son una regla del negocio, no
-// una decisión de maquetado: viven acá y no dentro de una pantalla.
 const CARGA_AL_LIMITE = 100
 const CARGA_ALTA = 85
 
@@ -434,20 +465,17 @@ export function textoDeCarga(carga) {
   return 'Tienes aire. La agenda respira.'
 }
 
-/**
- * El simulador de sostenibilidad: qué pasaría con otra cantidad de sesiones o
- * con otra tarifa. Mismas reglas que el panel real, en el mismo sitio.
- */
 export function simularSostenibilidad({ terapeuta, sesionesPorSemana, tarifa }) {
+  const t = terapeuta || {}
   const sesiones = numeroSeguro(sesionesPorSemana, 1, 1)
   const valor = numeroSeguro(tarifa, 1, 1)
   const bruto = sesiones * valor * 4
-  const neto = bruto - numeroSeguro(terapeuta.monthly_fixed_costs, 0)
-  const semilla = Math.round((neto > 0 ? neto : 0) * (terapeuta.porcentaje_semilla / 100))
-  const techo = numeroSeguro(terapeuta.sesiones_semanales_sostenibles, 20, 1)
+  const neto = bruto - numeroSeguro(t.monthly_fixed_costs, 0)
+  const semilla = Math.round((neto > 0 ? neto : 0) * (numeroSeguro(t.porcentaje_semilla, 10) / 100))
+  const techo = numeroSeguro(t.sesiones_semanales_sostenibles, 20, 1)
   return { bruto, neto, semilla, techo, excede: sesiones > techo }
 }
 
 export function soles(monto) {
-  return 'S/ ' + Number(monto).toLocaleString('es-PE', { maximumFractionDigits: 0 })
+  return 'S/ ' + Number(monto || 0).toLocaleString('es-PE', { maximumFractionDigits: 0 })
 }

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useId, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { Download, RotateCcw } from 'lucide-react'
 import { soles, useMirai } from '@/lib/store'
+import { claveDia } from '@/lib/fecha'
 import {
   BotonPrimario,
   BotonSuave,
@@ -14,10 +15,33 @@ import {
 } from '@/components/ui'
 
 export default function Ajustes() {
-  const { terapeuta, guardarAjustes, reiniciarDemo } = useMirai()
+  const { terapeuta, guardarAjustes, reiniciarMuestra, esMuestra, exportarTodo } = useMirai()
   const [datos, setDatos] = useState(terapeuta)
   const [guardado, setGuardado] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
+  const [descargando, setDescargando] = useState(false)
+  const [falloDescarga, setFalloDescarga] = useState(null)
+
+  // Un respaldo que ella puede pedir sin depender de nadie. Sale como JSON
+  // porque es lo que se puede volver a leer dentro de diez años.
+  const descargarTodo = async () => {
+    setDescargando(true)
+    setFalloDescarga(null)
+    try {
+      const datos = await exportarTodo()
+      const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const enlace = document.createElement('a')
+      enlace.href = url
+      enlace.download = `mirai-${claveDia(new Date())}.json`
+      enlace.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setFalloDescarga('No se pudo preparar la copia: ' + e.message)
+    } finally {
+      setDescargando(false)
+    }
+  }
 
   // Reiniciar la demo cambia el estado compartido; sin esto el formulario
   // seguiría mostrando en pantalla los valores anteriores.
@@ -157,13 +181,31 @@ export default function Ajustes() {
       </form>
 
       <div className="mt-12 max-w-2xl rounded-lg border border-border-sand bg-surface-container-low p-6">
-        <Rotulo>Sobre estos datos</Rotulo>
+        <Rotulo>Tus datos</Rotulo>
         <p className="text-body-md leading-relaxed text-on-surface-variant">
-          Esta versión guarda todo en este navegador, en esta computadora. No hay servidor, no hay
-          cuenta y nada sale de aquí. Si limpias los datos del navegador, se borra. Es a propósito:
-          sirve para probar el flujo completo antes de decidir la arquitectura real con Supabase.
+          {esMuestra
+            ? 'Esta es la muestra: todo se guarda en este navegador, en esta computadora. No hay servidor ni cuenta, y se pierde si limpias los datos de navegación. Los pacientes que ves son inventados.'
+            : 'Tus pacientes y tus notas viven en tu cuenta, aisladas de las de cualquier otra terapeuta. Las notas clínicas se guardan cifradas: quien tuviera acceso a la base de datos vería bytes, no lo que escribiste.'}
         </p>
-        <div className="mt-6">
+
+        <div className="mt-6 border-t border-border-mist pt-6">
+          <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
+            {esMuestra
+              ? 'Puedes descargar lo que hayas escrito acá para no perderlo.'
+              : 'Puedes llevarte todo cuando quieras. Es tu historia clínica, no la nuestra: si algún día dejas de usar Mirai, te vas con tus datos.'}
+          </p>
+          <BotonSuave onClick={descargarTodo} disabled={descargando}>
+            <Download size={14} strokeWidth={1.6} />
+            {descargando ? 'Preparando…' : 'Descargar una copia de todo'}
+          </BotonSuave>
+          {falloDescarga && (
+            <p role="alert" className="mt-3 text-body-sm text-alert-clinical">
+              {falloDescarga}
+            </p>
+          )}
+        </div>
+
+        <div className={esMuestra ? 'mt-6 border-t border-border-mist pt-6' : 'hidden'}>
           {confirmar ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-body-sm text-alert-clinical">
@@ -171,7 +213,7 @@ export default function Ajustes() {
               </span>
               <button
                 onClick={() => {
-                  reiniciarDemo()
+                  reiniciarMuestra()
                   setConfirmar(false)
                 }}
                 className="rounded-md bg-alert-clinical px-4 py-2 text-label-md uppercase text-on-error"

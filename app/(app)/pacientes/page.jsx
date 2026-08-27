@@ -193,10 +193,11 @@ function ModalNuevoPaciente({ abierto, cerrar, crear }) {
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value })
 
-  const guardar = (e) => {
+  const guardar = async (e) => {
     e.preventDefault()
     if (!datos.first_name.trim()) return
-    const nuevo = crear(datos)
+    const nuevo = await crear(datos)
+    if (!nuevo) return
     setDatos(vacio())
     cerrar()
     router.push(`/pacientes/${nuevo.id}`)

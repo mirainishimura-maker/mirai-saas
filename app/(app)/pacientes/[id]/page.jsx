@@ -43,7 +43,7 @@ function PerfilPaciente() {
     citas,
     mapas,
     actualizarPaciente,
-    eliminarPaciente,
+    archivarPaciente,
     eliminarNota,
     guardarMapa,
   } = useMirai()
@@ -205,7 +205,7 @@ function PerfilPaciente() {
           paciente={paciente}
           onGuardar={(cambios) => actualizarPaciente(paciente.id, cambios)}
           onEliminar={() => {
-            eliminarPaciente(paciente.id)
+            archivarPaciente(paciente.id)
             router.push('/pacientes')
           }}
         />

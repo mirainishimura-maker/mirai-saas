@@ -195,8 +195,8 @@ function Calendario() {
         pacientes={pacientes}
         pacientePrevio={pacientePrevio}
         diaPorDefecto={dia}
-        crear={(datos) => {
-          const cita = crearCita(datos)
+        crear={async (datos) => {
+          const cita = await crearCita(datos)
           if (!cita) return false
           const cuando = desdeClave(datos.dia)
           setDia(cuando)
@@ -523,10 +523,10 @@ function ModalNuevaCita({ abierto, cerrar, pacientes, pacientePrevio, diaPorDefe
           ? 'La sesión tiene que terminar después de empezar.'
           : null
 
-  const enviar = (e) => {
+  const enviar = async (e) => {
     e.preventDefault()
     if (!valida) return
-    if (crear(datos)) cerrar()
+    if (await crear(datos)) cerrar()
   }
 
   return (
