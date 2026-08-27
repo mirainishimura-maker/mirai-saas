@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+/* ── Mirai Calm System ────────────────────────────────────────────────
+   Tokens tomados tal cual del DESIGN.md del prototipo.
+   Filosofía: "la fricción es una función" y "cero urgencia".
+   ──────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Superficies */
+  --color-bg-warm: #faf8f5;
+  --color-surface: #fff8f1;
+  --color-surface-card: #ffffff;
+  --color-surface-dim: #e1d9cc;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fbf3e5;
+  --color-surface-container: #f5ede0;
+  --color-surface-container-high: #efe7da;
+  --color-surface-container-highest: #eae1d5;
+  --color-surface-variant: #eae1d5;
+  --color-sage-bg: #ebece6;
+  --color-inverse-surface: #343027;
+  --color-inverse-on-surface: #f8f0e3;
+
+  /* Tinta */
+  --color-on-surface: #1e1b13;
+  --color-on-surface-variant: #454841;
+  --color-ink-deep: #4a4a4a;
+  --color-outline: #757870;
+  --color-outline-variant: #c5c7bf;
+  --color-border-sand: #ece7de;
+  --color-border-mist: #f1ede4;
+
+  /* Salvia (autoridad clínica) */
+  --color-primary: #424b3c;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #5a6353;
+  --color-on-primary-container: #d5dfcb;
+  --color-primary-fixed: #dce6d1;
+  --color-primary-fixed-dim: #c0cab6;
+  --color-inverse-primary: #c0cab6;
+
+  /* Hoja apagada (crecimiento) */
+  --color-secondary: #51634e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d1e5ca;
+  --color-on-secondary-container: #556752;
+  --color-secondary-fixed: #d4e8cd;
+  --color-secondary-fixed-dim: #b8ccb2;
+  --color-on-secondary-fixed: #0f1f0f;
+
+  /* Terracota (egresos, ajustes) */
+  --color-tertiary: #614039;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #7b5750;
+  --color-tertiary-fixed: #ffdad3;
+  --color-tertiary-fixed-dim: #eabcb3;
+
+  /* Riesgo clínico — único color que sí grita, y solo aquí */
+  --color-alert-clinical: #b4483b;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Tipografía dual */
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+
+  --text-display-lg: 48px;
+  --text-display-lg--line-height: 1.15;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 600;
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--font-weight: 500;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 1.6;
+  --text-body-md: 16px;
+  --text-body-md--line-height: 1.5;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.4;
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--letter-spacing: 0.05em;
+  --text-label-md--font-weight: 600;
+  --text-label-sm: 11px;
+  --text-label-sm--line-height: 14px;
+  --text-label-sm--letter-spacing: 0.1em;
+  --text-label-sm--font-weight: 500;
+
+  /* Formas: nada de esquinas agresivas */
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* Ritmo */
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 40px;
+  --spacing-content: 1024px;
+  --spacing-focus: 672px;
+}
+
+html,
+body {
+  background-color: var(--color-bg-warm);
+  color: var(--color-on-surface);
+  /* Los paneles deslizantes esperan fuera del viewport hasta que se abren;
+     sin esto, en móvil aparece una franja de scroll horizontal. */
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-secondary-fixed);
+  color: var(--color-on-secondary-fixed);
+}
+
+/* Modo Calma: quita todo el color de la interfaz sin apagar la app.
+   El indicador de riesgo alto conserva su color a propósito. */
+html[data-calma="on"] body {
+  filter: grayscale(1);
+  transition: filter 600ms ease;
+}
+html[data-calma="on"] [data-preserva-color] {
+  filter: grayscale(0);
+}
+
+/* Barras de scroll discretas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-sand) transparent;
+}
+
+@keyframes mirai-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mirai-entra {
+  animation: mirai-fade-up 500ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

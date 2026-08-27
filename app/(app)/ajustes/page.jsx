@@ -1,0 +1,216 @@
+'use client'
+
+import { useState } from 'react'
+import { RotateCcw } from 'lucide-react'
+import { soles, useMirai } from '@/lib/store'
+import {
+  BotonPrimario,
+  BotonSuave,
+  Campo,
+  claseInput,
+  Encabezado,
+  Rotulo,
+  Tarjeta,
+} from '@/components/ui'
+
+export default function Ajustes() {
+  const { terapeuta, guardarAjustes, reiniciarDemo } = useMirai()
+  const [datos, setDatos] = useState(terapeuta)
+  const [guardado, setGuardado] = useState(false)
+  const [confirmar, setConfirmar] = useState(false)
+
+  const cambiar = (campo, numerico = false) => (e) => {
+    setDatos({ ...datos, [campo]: numerico ? Number(e.target.value) : e.target.value })
+    setGuardado(false)
+  }
+
+  const enviar = (e) => {
+    e.preventDefault()
+    guardarAjustes(datos)
+    setGuardado(true)
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-content px-margin-mobile py-10 md:px-margin-desktop">
+      <Encabezado
+        titulo="Ajustes"
+        bajada="Las reglas con las que Mirai calcula tu carga y tu sostenibilidad."
+      />
+
+      <form onSubmit={enviar} className="max-w-2xl space-y-6">
+        <Tarjeta>
+          <Rotulo>Quién eres</Rotulo>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Campo etiqueta="Nombre">
+              <input value={datos.full_name} onChange={cambiar('full_name')} className={claseInput} />
+            </Campo>
+            <Campo etiqueta="Colegiatura">
+              <input
+                value={datos.professional_license || ''}
+                onChange={cambiar('professional_license')}
+                className={claseInput}
+              />
+            </Campo>
+          </div>
+        </Tarjeta>
+
+        <Tarjeta>
+          <Rotulo>Tu economía</Rotulo>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Campo etiqueta="Tarifa por sesión (S/)">
+              <input
+                type="number"
+                min="0"
+                value={datos.tarifa_sesion}
+                onChange={cambiar('tarifa_sesion', true)}
+                className={claseInput}
+              />
+            </Campo>
+            <Campo etiqueta="Lo que quieres retirar al mes (S/)">
+              <input
+                type="number"
+                min="0"
+                value={datos.target_salary_monthly}
+                onChange={cambiar('target_salary_monthly', true)}
+                className={claseInput}
+              />
+            </Campo>
+            <Campo etiqueta="Costos fijos del mes (S/)" ayuda="Alquiler, software, supervisión.">
+              <input
+                type="number"
+                min="0"
+                value={datos.monthly_fixed_costs}
+                onChange={cambiar('monthly_fixed_costs', true)}
+                className={claseInput}
+              />
+            </Campo>
+            <Campo etiqueta="Fondo semilla (%)" ayuda="Se aparta de lo que te queda cada mes.">
+              <input
+                type="number"
+                min="0"
+                max="50"
+                value={datos.porcentaje_semilla}
+                onChange={cambiar('porcentaje_semilla', true)}
+                className={claseInput}
+              />
+            </Campo>
+          </div>
+        </Tarjeta>
+
+        <Tarjeta>
+          <Rotulo>Tu techo clínico</Rotulo>
+          <Campo
+            etiqueta="Sesiones por semana que puedes sostener"
+            ayuda="Mirai avisa cuando la agenda pasa de aquí. No lo bloquea: te lo dice."
+          >
+            <input
+              type="number"
+              min="1"
+              max="60"
+              value={datos.sesiones_semanales_sostenibles}
+              onChange={cambiar('sesiones_semanales_sostenibles', true)}
+              className={claseInput}
+            />
+          </Campo>
+          <p className="mt-4 text-body-sm italic leading-relaxed text-on-surface-variant">
+            Con {datos.sesiones_semanales_sostenibles} sesiones a {soles(datos.tarifa_sesion)}, un
+            mes completo te deja alrededor de{' '}
+            {soles(datos.sesiones_semanales_sostenibles * datos.tarifa_sesion * 4 - datos.monthly_fixed_costs)}{' '}
+            después de gastos fijos.
+          </p>
+        </Tarjeta>
+
+        <Tarjeta>
+          <Rotulo>Cómo se comporta Mirai</Rotulo>
+          <Interruptor
+            activo={datos.friccion_reflexiva}
+            onCambiar={(v) => {
+              setDatos({ ...datos, friccion_reflexiva: v })
+              setGuardado(false)
+            }}
+            titulo="Fricción reflexiva"
+            texto="Dos segundos de pausa entre pulsar guardar y guardar de verdad, con una pregunta en pantalla. Sirve para releer antes de cerrar la nota."
+          />
+          <div className="mt-6 border-t border-border-mist pt-6">
+            <Interruptor
+              activo={datos.modo_calma}
+              onCambiar={(v) => {
+                setDatos({ ...datos, modo_calma: v })
+                guardarAjustes({ modo_calma: v })
+              }}
+              titulo="Modo calma"
+              texto="Quita el color de toda la interfaz. El indicador de riesgo alto lo conserva a propósito."
+            />
+          </div>
+        </Tarjeta>
+
+        <div className="flex items-center gap-4">
+          <BotonPrimario type="submit">Guardar ajustes</BotonPrimario>
+          {guardado && <span className="text-body-sm italic text-secondary">Guardado.</span>}
+        </div>
+      </form>
+
+      <div className="mt-12 max-w-2xl rounded-lg border border-border-sand bg-surface-container-low p-6">
+        <Rotulo>Sobre estos datos</Rotulo>
+        <p className="text-body-md leading-relaxed text-on-surface-variant">
+          Esta versión guarda todo en este navegador, en esta computadora. No hay servidor, no hay
+          cuenta y nada sale de aquí. Si limpias los datos del navegador, se borra. Es a propósito:
+          sirve para probar el flujo completo antes de decidir la arquitectura real con Supabase.
+        </p>
+        <div className="mt-6">
+          {confirmar ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-body-sm text-alert-clinical">
+                Vuelve a los datos de ejemplo y borra lo que hayas escrito aquí.
+              </span>
+              <button
+                onClick={() => {
+                  reiniciarDemo()
+                  setConfirmar(false)
+                }}
+                className="rounded-md bg-alert-clinical px-4 py-2 text-label-md uppercase text-on-error"
+              >
+                Sí, reiniciar
+              </button>
+              <BotonSuave onClick={() => setConfirmar(false)}>No</BotonSuave>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmar(true)}
+              className="inline-flex items-center gap-2 text-label-md uppercase text-outline transition-colors hover:text-primary"
+            >
+              <RotateCcw size={14} strokeWidth={1.6} />
+              Reiniciar con los datos de ejemplo
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Interruptor({ activo, onCambiar, titulo, texto }) {
+  return (
+    <div className="flex items-start justify-between gap-6">
+      <div>
+        <p className="text-body-lg text-on-surface">{titulo}</p>
+        <p className="mt-1 max-w-md text-body-sm leading-relaxed text-on-surface-variant">{texto}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        onClick={() => onCambiar(!activo)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          activo ? 'bg-secondary' : 'bg-surface-variant'
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-surface-card transition-transform ${
+            activo ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
