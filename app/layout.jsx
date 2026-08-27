@@ -20,6 +20,8 @@ export const metadata = {
   title: 'Mirai — práctica clínica en calma',
   description:
     'Historia clínica, agenda y sostenibilidad para psicólogos independientes. Sin urgencia, sin ruido.',
+  // Es una muestra en evaluación, no un producto publicado.
+  robots: { index: false, follow: false },
 }
 
 export const viewport = {

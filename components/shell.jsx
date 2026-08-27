@@ -20,6 +20,7 @@ import {
 import { citasDelDia, useMirai } from '@/lib/store'
 import { hoy } from '@/lib/fecha'
 import PanelPendientes from './panel-pendientes'
+import AvisoMuestra from './aviso-muestra'
 
 const RUTAS = [
   { href: '/refugio', etiqueta: 'El Refugio', Icono: Home },
@@ -134,6 +135,7 @@ export default function Shell({ children }) {
       )}
 
       <div className="lg:ml-64">
+        <AvisoMuestra />
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border-mist bg-bg-warm/90 px-margin-mobile py-4 backdrop-blur-sm md:px-margin-desktop">
           <div className="flex items-center gap-4">
             <button
