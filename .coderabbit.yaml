@@ -1,0 +1,36 @@
+# Configuración de CodeRabbit — https://docs.coderabbit.ai/guides/configure-coderabbit
+language: es-ES
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  poem: false
+  request_changes_workflow: false
+  auto_review:
+    enabled: true
+    drafts: false
+    # Esta rama está congelada en el commit inicial y sirve de base para los
+    # PR de auditoría del repo completo. Sin esto CodeRabbit los ignora,
+    # porque por defecto solo revisa lo que apunta a la rama principal.
+    base_branches:
+      - "main"
+      - "punto-cero"
+  path_filters:
+    - "!package-lock.json"
+  path_instructions:
+    - path: "lib/**"
+      instructions: >-
+        Esta es la única capa de datos de la app y está pensada para
+        reemplazarse por Supabase sin tocar las pantallas. Señala cualquier
+        lógica de negocio que se haya filtrado a los componentes, y cualquier
+        manejo de fechas que use UTC: en este proyecto las fechas deben ser
+        siempre locales (Perú es UTC-5).
+    - path: "app/**"
+      instructions: >-
+        Componentes de React en Next.js App Router. Revisa accesibilidad
+        (roles, etiquetas, foco), estados vacíos y de error, y que no haya
+        cálculos que deberían vivir en lib/store.jsx.
+
+chat:
+  auto_reply: true
