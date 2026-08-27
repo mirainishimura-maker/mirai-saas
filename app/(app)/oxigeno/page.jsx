@@ -425,7 +425,7 @@ function ModalMovimiento({ abierto, cerrar, registrar }) {
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <BotonSuave type="button" onClick={cerrar}>
+          <BotonSuave type="button" onClick={cerrar} disabled={guardando}>
             Cancelar
           </BotonSuave>
           <BotonPrimario type="submit" disabled={guardando}>

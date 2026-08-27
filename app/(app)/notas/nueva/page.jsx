@@ -53,6 +53,10 @@ function LienzoDeEnfoque() {
   const [fase, setFase] = useState('escribiendo') // escribiendo | pausa | guardada
   const [progreso, setProgreso] = useState(0)
   const [fallo, setFallo] = useState(null)
+  const [guardando, setGuardando] = useState(false)
+  // Ref y no estado: el bloqueo tiene que valer en el mismo tic del clic,
+  // antes de que React vuelva a pintar.
+  const guardandoRef = useRef(false)
   const areaRef = useRef(null)
 
   const paciente = pacientes.find((p) => p.id === pacienteId)
@@ -82,6 +86,9 @@ function LienzoDeEnfoque() {
     async (datos) => {
       const b = datos || congelado.current
       if (!b || !b.pacienteId || !b.texto.trim()) return
+      if (guardandoRef.current) return
+      guardandoRef.current = true
+      setGuardando(true)
       try {
         // La nota se da por guardada cuando está guardada de verdad. Decirlo
         // antes sería lo peor que puede hacer esta pantalla: la terapeuta
@@ -91,10 +98,7 @@ function LienzoDeEnfoque() {
           raw_narrative: b.texto.trim(),
           treatment_modality: b.modalidad,
           inferred_risk_level: b.riesgo,
-          tags: b.etiquetas
-            .split(',')
-            .map((t) => t.trim().toLowerCase())
-            .filter(Boolean),
+          tags: b.etiquetas,
         })
         setFase('guardada')
         salida.current = setTimeout(() => router.push(`/pacientes/${nota.patient_id}`), 900)
@@ -102,6 +106,9 @@ function LienzoDeEnfoque() {
         setFallo(fallo.message || 'No se pudo guardar la nota. Tu texto sigue acá.')
         setFase('escribiendo')
         setProgreso(0)
+      } finally {
+        guardandoRef.current = false
+        setGuardando(false)
       }
     },
     [guardarNota, router],
@@ -272,10 +279,10 @@ function LienzoDeEnfoque() {
                 </span>
                 <button
                   onClick={iniciarGuardado}
-                  disabled={!pacienteId || !texto.trim()}
+                  disabled={!pacienteId || !texto.trim() || guardando}
                   className="rounded-md bg-secondary px-8 py-3 text-label-md uppercase text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:bg-surface-variant disabled:text-outline"
                 >
-                  Finalizar nota clínica
+                  {guardando ? 'Guardando…' : 'Finalizar nota clínica'}
                 </button>
               </>
             )}

@@ -119,6 +119,10 @@ export function MiraiProvider({ children }) {
     setEstado(cargado)
   }, [])
 
+  // Cola y turno por paciente para las escrituras del mapa.
+  const colaMapa = useRef(new Map()).current
+  const turnosMapa = useRef(new Map()).current
+
   const acciones = useMemo(() => {
     // Cada acción escribe primero donde toque y luego refleja el cambio en
     // pantalla. Si la escritura falla, la pantalla no miente: se queda como
@@ -162,7 +166,11 @@ export function MiraiProvider({ children }) {
       },
 
       async guardarNota(datos) {
-        const nota = await a().guardarNota(datos)
+        const nota = await a().guardarNota({
+          ...datos,
+          session_date: datos.session_date || claveDia(new Date()),
+          tags: normalizarEtiquetas(datos.tags),
+        })
         setEstado((e) => ({
           ...e,
           sesiones: [nota, ...e.sesiones],
@@ -231,13 +239,27 @@ export function MiraiProvider({ children }) {
 
       async guardarMapa(pacienteId, contenido) {
         const previo = estadoActual().mapas[pacienteId]
-        // El mapa se arrastra: la pantalla va por delante para que no dé
-        // tirones, pero si la escritura falla se vuelve a lo último bueno.
+        // El mapa se arrastra, así que salen muchas escrituras seguidas. Se
+        // encolan por paciente para que no lleguen desordenadas, y solo se
+        // revierte si esta seguía siendo la última: si no, el rollback de una
+        // vieja pisaría una edición posterior que sí se guardó.
+        const turno = (turnosMapa.get(pacienteId) || 0) + 1
+        turnosMapa.set(pacienteId, turno)
+
         setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: contenido } }))
+
+        const anterior = colaMapa.get(pacienteId) || Promise.resolve()
+        const actual = anterior
+          .catch(() => {})
+          .then(() => a().guardarMapa(pacienteId, contenido))
+        colaMapa.set(pacienteId, actual)
+
         try {
-          await a().guardarMapa(pacienteId, contenido)
+          await actual
         } catch (fallo) {
-          setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: previo } }))
+          if (turnosMapa.get(pacienteId) === turno) {
+            setEstado((e) => ({ ...e, mapas: { ...e.mapas, [pacienteId]: previo } }))
+          }
           throw fallo
         }
       },
@@ -326,6 +348,13 @@ export function citaValida(datos) {
   const inicio = minutosDelDia(datos.inicio)
   const fin = minutosDelDia(datos.fin)
   return inicio !== null && fin !== null && fin > inicio
+}
+
+/** Las etiquetas son el único modo de buscar en un historial cifrado. */
+export function normalizarEtiquetas(tags) {
+  if (!tags) return []
+  const lista = Array.isArray(tags) ? tags : String(tags).split(',')
+  return [...new Set(lista.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
 }
 
 function numeroSeguro(valor, reserva, minimo = 0) {

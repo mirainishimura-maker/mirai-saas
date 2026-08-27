@@ -22,7 +22,10 @@ create table if not exists public.therapists (
     full_name text not null default '',
     professional_license text,
     base_currency varchar(3) not null default 'PEN',
-    tarifa_sesion numeric(12, 2) not null default 75 check (tarifa_sesion >= 0),
+    -- Mayor que cero, no solo no negativa: financial_transactions.amount
+    -- exige > 0, y una tarifa en cero haría fallar el cobro y revertiría el
+    -- 'atendida' entero al marcar una sesión.
+    tarifa_sesion numeric(12, 2) not null default 75 check (tarifa_sesion > 0),
     target_salary_monthly numeric(12, 2) not null default 3000 check (target_salary_monthly >= 0),
     monthly_fixed_costs numeric(12, 2) not null default 800 check (monthly_fixed_costs >= 0),
     sesiones_semanales_sostenibles int not null default 20
@@ -49,6 +52,10 @@ begin
     return new;
 end;
 $$;
+
+-- La invoca el disparador, no el cliente: mismo cuidado que en el resto de
+-- funciones definer, o PostgREST la publica como RPC.
+revoke all on function public.crear_perfil_terapeuta() from public, anon, authenticated;
 
 drop trigger if exists al_crear_usuario on auth.users;
 create trigger al_crear_usuario
