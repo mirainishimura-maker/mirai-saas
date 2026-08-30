@@ -63,8 +63,11 @@ export default function Entrar() {
 
   const verMuestra = () => {
     activarMuestra()
-    router.push('/refugio')
-    router.refresh()
+    // Recarga completa a propósito: el modo se decide una sola vez, al
+    // arrancar el proveedor. Con la navegación de cliente el proveedor no se
+    // vuelve a montar, la marca de muestra no se lee, y el guardia rebota a
+    // /entrar. Con la recarga, el arranque encuentra la marca y abre la muestra.
+    window.location.assign('/refugio')
   }
 
   return (
