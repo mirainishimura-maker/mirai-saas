@@ -6,7 +6,16 @@
 -- Es la misma comprobación de verificar.sql, resumida en un veredicto.
 -- ═══════════════════════════════════════════════════════════════════
 
-with funciones_abiertas as (
+with tablas_presentes as (
+    select count(*) as n
+    from pg_tables
+    where schemaname = 'public'
+      and tablename in (
+        'therapists', 'patients', 'clinical_sessions', 'appointments',
+        'financial_transactions', 'alliance_maps', 'administrative_buffer', 'access_log'
+      )
+),
+funciones_abiertas as (
     select p.proname
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
@@ -38,6 +47,11 @@ politicas_sin_candado as (
       and cmd in ('ALL', 'INSERT', 'UPDATE')
       and with_check is null
 )
+select '0 · las 8 tablas existen' as comprobacion,
+       case when n = 8 then 'BIEN'
+            else 'MAL — hay ' || n || ' de 8: ¿corriste instalar-todo.sql?' end as resultado
+from tablas_presentes
+union all
 select '1 · funciones delicadas cerradas' as comprobacion,
        case when count(*) = 0 then 'BIEN'
             else 'MAL — abiertas: ' || string_agg(proname, ', ') end as resultado
