@@ -744,6 +744,12 @@ $$;
 -- Su historia clínica tiene que poder salir de Mirai. Esto es lo que la
 -- protege a ella si el servicio desaparece, y lo que hace razonable
 -- confiarle los datos en primer lugar.
+--
+-- Cada subconsulta filtra por paciente Y por terapeuta. Que el paciente sea
+-- suyo ya se comprobó arriba, así que el segundo filtro hoy es redundante.
+-- Va igual porque security definer se salta RLS: esta es la única función
+-- que devuelve historias en claro, y es el último sitio donde conviene
+-- depender de que una comprobación de más arriba siga estando ahí mañana.
 create or replace function public.exportar_historia(p_patient_id uuid)
 returns jsonb
 language plpgsql
@@ -779,21 +785,24 @@ begin
                 'etiquetas', s.tags,
                 'narrativa', extensions.pgp_sym_decrypt(s.raw_narrative_encrypted, v_clave)
             ) order by s.session_date)
-            from public.clinical_sessions s where s.patient_id = p_patient_id
+            from public.clinical_sessions s
+            where s.patient_id = p_patient_id and s.therapist_id = v_terapeuta
         ), '[]'::jsonb),
         'citas', coalesce((
             select jsonb_agg(jsonb_build_object(
                 'dia', a.dia, 'inicio', a.inicio, 'fin', a.fin, 'estado', a.status
             ) order by a.dia)
-            from public.appointments a where a.patient_id = p_patient_id
+            from public.appointments a
+            where a.patient_id = p_patient_id and a.therapist_id = v_terapeuta
         ), '[]'::jsonb),
         'mapa', coalesce((
-            select m.contenido from public.alliance_maps m where m.patient_id = p_patient_id
+            select m.contenido from public.alliance_maps m
+            where m.patient_id = p_patient_id and m.therapist_id = v_terapeuta
         ), '{}'::jsonb)
     )
     into v_salida
     from public.patients p
-    where p.id = p_patient_id;
+    where p.id = p_patient_id and p.therapist_id = v_terapeuta;
 
     perform public.registrar_acceso('exportar', null, p_patient_id);
     return v_salida;
