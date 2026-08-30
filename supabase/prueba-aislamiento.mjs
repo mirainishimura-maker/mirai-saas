@@ -55,7 +55,7 @@ const A = await entrar(correoA, claveA)
 
 const { data: paciente, error: fp } = await A.c
   .from('patients')
-  .insert({ therapist_id: A.uid, full_name: 'Paciente De Prueba' })
+  .insert({ therapist_id: A.uid, first_name: 'Paciente', last_name: 'De Prueba' })
   .select('id')
   .single()
 if (fp) throw new Error(`A no pudo crear su paciente: ${fp.message}`)
@@ -110,7 +110,7 @@ const B = await entrar(correoB, claveB)
 }
 
 { // insertar un paciente a nombre de A → WITH CHECK lo rechaza
-  const { error } = await B.c.from('patients').insert({ therapist_id: A.uid, full_name: 'Intruso' })
+  const { error } = await B.c.from('patients').insert({ therapist_id: A.uid, first_name: 'Intruso' })
   if (error) bien(`B no puede crear pacientes a nombre de A (${error.code})`)
   else mal('¡B CREÓ UN PACIENTE A NOMBRE DE A!')
 }
