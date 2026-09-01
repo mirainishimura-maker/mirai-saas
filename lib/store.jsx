@@ -328,6 +328,11 @@ export function MiraiProvider({ children }) {
       modo,
       error,
       esMuestra: modo === 'muestra',
+      // El plan de la cuenta. En la muestra todo está abierto: que se vea
+      // lo que se vende. En la nube manda la columna therapists.plan, que
+      // solo se cambia con la llave de servicio — el navegador no puede.
+      plan: modo === 'muestra' ? 'premium' : (estado.terapeuta?.plan ?? 'base'),
+      esPremium: modo === 'muestra' || ['premium', 'consultorio'].includes(estado.terapeuta?.plan),
       listo: modo === 'nube' || modo === 'muestra',
       ...acciones,
     }),

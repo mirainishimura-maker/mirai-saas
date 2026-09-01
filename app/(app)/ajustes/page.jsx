@@ -15,8 +15,23 @@ import {
   Tarjeta,
 } from '@/components/ui'
 
+const NOMBRE_PLAN = { base: 'Base', premium: 'Premium', consultorio: 'Consultorio' }
+
+const CAMPOS_EDITABLES = [
+  'full_name',
+  'professional_license',
+  'base_currency',
+  'tarifa_sesion',
+  'target_salary_monthly',
+  'monthly_fixed_costs',
+  'sesiones_semanales_sostenibles',
+  'porcentaje_semilla',
+  'friccion_reflexiva',
+  'modo_calma',
+]
+
 export default function Ajustes() {
-  const { terapeuta, guardarAjustes, reiniciarMuestra, esMuestra, exportarTodo } = useMirai()
+  const { terapeuta, guardarAjustes, reiniciarMuestra, esMuestra, exportarTodo, plan } = useMirai()
   const [datos, setDatos] = useState(terapeuta)
   const [guardado, setGuardado] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
@@ -66,7 +81,11 @@ export default function Ajustes() {
     e.preventDefault()
     setFalloGuardado(null)
     try {
-      await guardarAjustes(datos)
+      // Solo las columnas editables: la fila trae mas campos (id, plan,
+      // created_at) y la base rechaza el update entero si viajan.
+      const payload = {}
+      for (const k of CAMPOS_EDITABLES) if (k in datos) payload[k] = datos[k]
+      await guardarAjustes(payload)
       setGuardado(true)
     } catch (fallo) {
       setFalloGuardado(fallo.message || 'No se pudieron guardar los ajustes.')
@@ -198,6 +217,11 @@ export default function Ajustes() {
 
       <div className="mt-12 max-w-2xl rounded-lg border border-border-sand bg-surface-container-low p-6">
         <Rotulo>Tus datos</Rotulo>
+        {!esMuestra && (
+          <p className="mb-2 text-body-sm text-outline">
+            Tu plan: <span className="font-medium text-on-surface">{NOMBRE_PLAN[plan] || 'Base'}</span>
+          </p>
+        )}
         <p className="text-body-md leading-relaxed text-on-surface-variant">
           {esMuestra
             ? 'Esta es la muestra: todo se guarda en este navegador, en esta computadora. No hay servidor ni cuenta, y se pierde si limpias los datos de navegación. Los pacientes que ves son inventados.'
