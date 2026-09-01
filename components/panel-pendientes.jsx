@@ -142,7 +142,7 @@ export default function PanelPendientes({ abierto, cerrar }) {
             Dar por visto
           </button>
           <p className="mt-4 text-center text-body-sm italic leading-relaxed text-outline">
-            Mirai nunca te interrumpe con esto. Lo administrativo espera acá hasta que tú lo abras.
+            Notaluma nunca te interrumpe con esto. Lo administrativo espera acá hasta que tú lo abras.
           </p>
         </div>
       </aside>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import ArbolDeRiqueza from '@/components/arbol'
 
 export const metadata = {
-  title: 'Mirai — tener tiempo para pensar en ellos',
+  title: 'Notaluma — tener tiempo para pensar en ellos',
 }
 
 export default function Bienvenida() {
@@ -10,7 +10,7 @@ export default function Bienvenida() {
     <div className="flex min-h-screen flex-col">
       <header className="w-full px-margin-mobile py-8 md:px-margin-desktop">
         <div className="flex items-center justify-between">
-          <span className="font-serif text-headline-lg tracking-tight text-primary">Mirai</span>
+          <span className="font-serif text-headline-lg tracking-tight text-primary">Notaluma</span>
           <Link
             href="/refugio"
             className="border-b border-primary/30 pb-1 text-label-md uppercase text-primary transition-colors hover:border-primary"
@@ -50,7 +50,7 @@ export default function Bienvenida() {
         <section className="flex flex-col gap-32">
           <Vineta
             titulo="Narrativa viva"
-            texto="Tus notas clínicas no son campos a rellenar, son el testimonio de un encuentro. Mirai ofrece un lienzo limpio donde la escritura vuelve a ser un proceso reflexivo."
+            texto="Tus notas clínicas no son campos a rellenar, son el testimonio de un encuentro. Notaluma ofrece un lienzo limpio donde la escritura vuelve a ser un proceso reflexivo."
             invertida
           >
             <MapaIlustrado />
@@ -96,7 +96,7 @@ export default function Bienvenida() {
       <footer className="w-full pb-12 pt-8">
         <div className="mx-auto flex max-w-content flex-col items-center gap-4 px-margin-mobile text-body-sm text-outline md:px-margin-desktop">
           <span className="mb-2 h-px w-12 bg-outline/20" />
-          <span className="font-serif text-xl italic text-primary/60">Mirai</span>
+          <span className="font-serif text-xl italic text-primary/60">Notaluma</span>
         </div>
       </footer>
     </div>

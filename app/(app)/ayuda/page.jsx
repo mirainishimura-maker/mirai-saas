@@ -49,7 +49,7 @@ export default function Ayuda() {
   return (
     <div className="mx-auto w-full max-w-content px-margin-mobile py-10 md:px-margin-desktop">
       <Encabezado
-        titulo="Cómo se usa Mirai"
+        titulo="Cómo se usa Notaluma"
         bajada="Seis pantallas, una sola idea: que la administración no te robe la cabeza antes de entrar a sesión."
       />
 

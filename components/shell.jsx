@@ -69,7 +69,7 @@ export default function Shell({ children }) {
           <Marca />
           <div className="min-w-0">
             <p className="truncate font-serif text-headline-md leading-tight text-secondary">
-              {terapeuta?.full_name?.trim() || 'Mirai'}
+              {terapeuta?.full_name?.trim() || 'Notaluma'}
             </p>
             <p className="text-body-sm text-on-surface-variant">
               {delDia.length === 0
@@ -153,7 +153,7 @@ export default function Shell({ children }) {
             >
               {menuAbierto ? <X size={22} strokeWidth={1.6} /> : <Menu size={22} strokeWidth={1.6} />}
             </button>
-            <span className="font-serif text-headline-md text-primary lg:hidden">Mirai</span>
+            <span className="font-serif text-headline-md text-primary lg:hidden">Notaluma</span>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">

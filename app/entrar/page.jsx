@@ -61,6 +61,33 @@ export default function Entrar() {
     }
   }
 
+  const olvide = async () => {
+    setError(null)
+    setMensaje(null)
+    if (!hayNube) {
+      setError('Todavía no hay servidor configurado.')
+      return
+    }
+    if (!correo.trim()) {
+      setError('Escribe tu correo arriba y vuelve a tocar este enlace.')
+      return
+    }
+    setCargando(true)
+    try {
+      const { error: fallo } = await supabase().auth.resetPasswordForEmail(correo.trim(), {
+        redirectTo: window.location.origin + '/restablecer',
+      })
+      if (fallo) throw fallo
+      // El mismo mensaje exista o no la cuenta: esta pantalla no confirma
+      // a un extraño qué correos tienen cuenta y cuáles no.
+      setMensaje('Si existe una cuenta con ese correo, te enviamos un enlace para crear una contraseña nueva. Puede tardar unos minutos.')
+    } catch (fallo) {
+      setError(traducir(fallo.message))
+    } finally {
+      setCargando(false)
+    }
+  }
+
   const verMuestra = () => {
     activarMuestra()
     // Recarga completa a propósito: el modo se decide una sola vez, al
@@ -74,7 +101,7 @@ export default function Entrar() {
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="px-margin-mobile py-8 md:px-margin-desktop">
         <Link href="/bienvenida" className="font-serif text-headline-lg tracking-tight text-primary">
-          Mirai
+          Notaluma
         </Link>
       </header>
 
@@ -85,7 +112,7 @@ export default function Entrar() {
           </h1>
           <p className="mb-10 text-body-md leading-relaxed text-on-surface-variant">
             {crearCuenta
-              ? 'Tus pacientes y tus notas serán solo tuyos: nadie más, ni siquiera otra terapeuta con cuenta en Mirai, puede verlos.'
+              ? 'Tus pacientes y tus notas serán solo tuyos: nadie más, ni siquiera otra terapeuta con cuenta en Notaluma, puede verlos.'
               : 'Bienvenida de vuelta.'}
           </p>
 
@@ -139,6 +166,17 @@ export default function Entrar() {
                 </span>
               )}
             </label>
+
+            {!crearCuenta && (
+              <button
+                type="button"
+                onClick={olvide}
+                disabled={cargando}
+                className="text-body-sm text-secondary underline-offset-4 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            )}
 
             {error && (
               <p role="alert" className="rounded-md bg-error-container/40 p-3 text-body-sm text-alert-clinical">

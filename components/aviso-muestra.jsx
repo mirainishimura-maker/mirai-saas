@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 const LLAVE = 'mirai.aviso-muestra'
 
 /**
- * Mientras Mirai no tenga cuentas ni servidor, quien la abra tiene derecho a
+ * Mientras Notaluma no tenga cuentas ni servidor, quien la abra tiene derecho a
  * saber dos cosas antes de escribir nada: que los pacientes son inventados y
  * que lo que escriba vive solo en ese navegador. Se puede cerrar, pero vuelve
  * a aparecer en cada visita nueva: es una advertencia, no una notificación.

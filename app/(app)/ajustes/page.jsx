@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from 'react'
 import { Download, RotateCcw } from 'lucide-react'
 import { simularSostenibilidad, soles, useMirai } from '@/lib/store'
 import { claveDia } from '@/lib/fecha'
+import { supabase } from '@/lib/supabase/navegador'
 import {
   BotonPrimario,
   BotonSuave,
@@ -76,7 +77,7 @@ export default function Ajustes() {
     <div className="mx-auto w-full max-w-content px-margin-mobile py-10 md:px-margin-desktop">
       <Encabezado
         titulo="Ajustes"
-        bajada="Las reglas con las que Mirai calcula tu carga y tu sostenibilidad."
+        bajada="Las reglas con las que Notaluma calcula tu carga y tu sostenibilidad."
       />
 
       <form onSubmit={enviar} className="max-w-2xl space-y-6">
@@ -143,7 +144,7 @@ export default function Ajustes() {
           <Rotulo>Tu techo clínico</Rotulo>
           <Campo
             etiqueta="Sesiones por semana que puedes sostener"
-            ayuda="Mirai avisa cuando la agenda pasa de aquí. No lo bloquea: te lo dice."
+            ayuda="Notaluma avisa cuando la agenda pasa de aquí. No lo bloquea: te lo dice."
           >
             <input
               type="number"
@@ -161,7 +162,7 @@ export default function Ajustes() {
         </Tarjeta>
 
         <Tarjeta>
-          <Rotulo>Cómo se comporta Mirai</Rotulo>
+          <Rotulo>Cómo se comporta Notaluma</Rotulo>
           <Interruptor
             activo={datos.friccion_reflexiva}
             onCambiar={(v) => {
@@ -207,7 +208,7 @@ export default function Ajustes() {
           <p className="mb-4 text-body-md leading-relaxed text-on-surface-variant">
             {esMuestra
               ? 'Puedes descargar lo que hayas escrito acá para no perderlo.'
-              : 'Puedes llevarte todo cuando quieras. Es tu historia clínica, no la nuestra: si algún día dejas de usar Mirai, te vas con tus datos.'}
+              : 'Puedes llevarte todo cuando quieras. Es tu historia clínica, no la nuestra: si algún día dejas de usar Notaluma, te vas con tus datos.'}
           </p>
           <BotonSuave onClick={descargarTodo} disabled={descargando}>
             <Download size={14} strokeWidth={1.6} />
@@ -219,6 +220,12 @@ export default function Ajustes() {
             </p>
           )}
         </div>
+
+        {!esMuestra && (
+          <div className="mt-6 border-t border-border-mist pt-6">
+            <CambioDeContrasena />
+          </div>
+        )}
 
         <div className={esMuestra ? 'mt-6 border-t border-border-mist pt-6' : 'hidden'}>
           {confirmar ? (
@@ -279,5 +286,84 @@ function Interruptor({ activo, onCambiar, titulo, texto }) {
         />
       </button>
     </div>
+  )
+}
+
+/**
+ * Cambiar la contraseña con la sesión abierta. No pide la actual porque la
+ * sesión ya la respalda; el riesgo de laptop abierta lo cubre el cierre por
+ * inactividad de veinte minutos.
+ */
+function CambioDeContrasena() {
+  const [abierto, setAbierto] = useState(false)
+  const [clave, setClave] = useState('')
+  const [repite, setRepite] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [aviso, setAviso] = useState(null)   // { tipo: 'bien' | 'mal', texto }
+
+  const guardar = async (e) => {
+    e.preventDefault()
+    setAviso(null)
+    if (clave.length < 10) {
+      setAviso({ tipo: 'mal', texto: 'La contraseña necesita al menos 10 caracteres.' })
+      return
+    }
+    if (clave !== repite) {
+      setAviso({ tipo: 'mal', texto: 'Las dos contraseñas no coinciden.' })
+      return
+    }
+    setGuardando(true)
+    try {
+      const { error } = await supabase().auth.updateUser({ password: clave })
+      if (error) throw error
+      setClave('')
+      setRepite('')
+      setAbierto(false)
+      setAviso({ tipo: 'bien', texto: 'Contraseña cambiada. Guárdala en tu gestor.' })
+    } catch (error) {
+      setAviso({ tipo: 'mal', texto: error.message || 'No se pudo cambiar. Inténtalo de nuevo.' })
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <div>
+        <button
+          onClick={() => { setAbierto(true); setAviso(null) }}
+          className="text-label-md uppercase text-outline transition-colors hover:text-primary"
+        >
+          Cambiar mi contraseña
+        </button>
+        {aviso?.tipo === 'bien' && (
+          <p role="status" className="mt-3 text-body-sm italic text-secondary">{aviso.texto}</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={guardar} className="max-w-sm space-y-4">
+      <label className="block">
+        <span className="mb-2 block text-label-md uppercase text-on-surface-variant">Contraseña nueva</span>
+        <input type="password" value={clave} onChange={(e) => setClave(e.target.value)}
+          autoComplete="new-password" required minLength={10} className={claseInput} />
+      </label>
+      <label className="block">
+        <span className="mb-2 block text-label-md uppercase text-on-surface-variant">Repítela</span>
+        <input type="password" value={repite} onChange={(e) => setRepite(e.target.value)}
+          autoComplete="new-password" required minLength={10} className={claseInput} />
+      </label>
+      {aviso?.tipo === 'mal' && (
+        <p role="alert" className="text-body-sm text-alert-clinical">{aviso.texto}</p>
+      )}
+      <div className="flex items-center gap-3">
+        <BotonPrimario type="submit" disabled={guardando}>
+          {guardando ? 'Un momento…' : 'Guardar'}
+        </BotonPrimario>
+        <BotonSuave type="button" onClick={() => setAbierto(false)}>Cancelar</BotonSuave>
+      </div>
+    </form>
   )
 }

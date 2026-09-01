@@ -11,7 +11,7 @@ import { claveDia, desdeClave, hoy, inicioSemana, sumarDias } from './fecha'
 // adaptadores con la misma forma:
 //
 //   nube    → Supabase. Datos reales, cuenta propia, notas cifradas.
-//   muestra → localStorage. Datos inventados, para recorrer Mirai sin cuenta.
+//   muestra → localStorage. Datos inventados, para recorrer Notaluma sin cuenta.
 //
 // Ninguna pantalla sabe cuál está activo, y esa es toda la gracia: cuando
 // una terapeuta inicia sesión, las nueve pantallas empiezan a hablar con
@@ -72,7 +72,7 @@ export function MiraiProvider({ children }) {
 
         if (vivo) setModo('sin-sesion')
       } catch (e) {
-        console.error('Mirai · arrancando:', e)
+        console.error('Notaluma · arrancando:', e)
         if (vivo) {
           setError(e.message)
           setModo('sin-sesion')
@@ -101,7 +101,7 @@ export function MiraiProvider({ children }) {
           setEstado(cargado)
           setModo('nube')
         } catch (e) {
-          console.error('Mirai · entrando:', e)
+          console.error('Notaluma · entrando:', e)
           setError(e.message)
         }
       }
