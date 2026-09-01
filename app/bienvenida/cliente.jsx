@@ -5,8 +5,9 @@ import { useRef, useState } from 'react'
 import { Volume2, VolumeX } from 'lucide-react'
 import { activarMuestra } from '@/lib/store'
 
-// El número del negocio (Atendia). El mensaje llega prellenado.
-const WHATSAPP = 'PONER_NUMERO'
+// Provisional: el número personal de Mirai, hasta que exista línea de negocio.
+// El mensaje llega prellenado.
+const WHATSAPP = '51977668497'
 const MENSAJE = 'Hola, vi Notaluma y quiero abrir mi consultorio digital. ¿Me cuentas cómo empezar?'
 const WA_LINK = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(MENSAJE)}`
 
