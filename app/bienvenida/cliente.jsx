@@ -120,15 +120,15 @@ export default function BienvenidaCliente() {
 
           {/* ── Los niveles ── */}
           <div className="flex flex-col gap-3">
-            <Plan nombre="Base" detalle="Tu consultorio: notas cifradas, agenda, oxígeno" />
+            <Plan nombre="Base" detalle="Tu consultorio: notas cifradas, agenda, oxígeno" precio="S/0 · por invitación" />
             <Plan
               nombre="Premium"
-              detalle="+ enlace público de agendamiento, embudo de interesados, recordatorios"
+              detalle="+ enlace público de agendamiento, embudo de interesados, recordatorios" precio="S/59/mes"
               destacado
             />
-            <Plan nombre="Consultorio" detalle="+ equipo, sedes y liquidación" />
+            <Plan nombre="Consultorio" detalle="+ equipo, sedes y liquidación" precio="S/199/mes · hasta 6" />
             <p className="px-2 text-body-sm italic text-outline">
-              Precios de lanzamiento por definir — las cuentas se abren por invitación.
+              Las cuentas se abren por invitación. Primeras cuentas fundadoras: Premium a S/49 de por vida.
             </p>
           </div>
         </div>
@@ -183,7 +183,7 @@ function Bloque({ titulo, children }) {
   )
 }
 
-function Plan({ nombre, detalle, destacado }) {
+function Plan({ nombre, detalle, destacado, precio }) {
   return (
     <div
       className={`flex items-baseline justify-between gap-4 rounded-xl border bg-surface-card px-5 py-4 ${
@@ -194,7 +194,7 @@ function Plan({ nombre, detalle, destacado }) {
         <span className="font-serif text-headline-sm text-ink-deep">{nombre}</span>
         <p className="text-body-sm text-on-surface-variant">{detalle}</p>
       </div>
-      <span className="whitespace-nowrap text-body-sm text-outline">por definir</span>
+      <span className="whitespace-nowrap text-body-sm font-medium text-on-surface">{precio}</span>
     </div>
   )
 }
