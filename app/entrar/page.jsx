@@ -112,8 +112,8 @@ export default function Entrar() {
           </h1>
           <p className="mb-10 text-body-md leading-relaxed text-on-surface-variant">
             {crearCuenta
-              ? 'Tus pacientes y tus notas serán solo tuyos: nadie más, ni siquiera otra terapeuta con cuenta en Notaluma, puede verlos.'
-              : 'Bienvenida de vuelta.'}
+              ? 'Tus pacientes y tus notas serán solo tuyos: nadie más con cuenta en Notaluma puede verlos, sin importar quién sea.'
+              : 'Qué bueno verte de nuevo.'}
           </p>
 
           <form onSubmit={enviar} className="space-y-5">

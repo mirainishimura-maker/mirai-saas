@@ -225,7 +225,7 @@ export default function Ajustes() {
         <p className="text-body-md leading-relaxed text-on-surface-variant">
           {esMuestra
             ? 'Esta es la muestra: todo se guarda en este navegador, en esta computadora. No hay servidor ni cuenta, y se pierde si limpias los datos de navegación. Los pacientes que ves son inventados.'
-            : 'Tus pacientes y tus notas viven en tu cuenta, aisladas de las de cualquier otra terapeuta. Las notas clínicas se guardan cifradas: quien tuviera acceso a la base de datos vería bytes, no lo que escribiste.'}
+            : 'Tus pacientes y tus notas viven en tu cuenta, aisladas de las de cualquier otro profesional. Las notas clínicas se guardan cifradas: quien tuviera acceso a la base de datos vería bytes, no lo que escribiste.'}
         </p>
 
         <div className="mt-6 border-t border-border-mist pt-6">

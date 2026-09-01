@@ -273,7 +273,7 @@ function Simulador({ terapeuta }) {
               className="mt-3 flex items-start gap-2 rounded-md border border-error/10 bg-error-container/20 p-3 text-body-sm text-alert-clinical"
             >
               <TriangleAlert size={16} strokeWidth={1.8} className="mt-0.5 shrink-0" />
-              Pasar de {techo} sesiones fue lo que tú misma
+              Pasar de {techo} sesiones fue lo que tú
               definiste como tu techo. Más allá de ahí, lo que se paga no es dinero.
             </p>
           )}
