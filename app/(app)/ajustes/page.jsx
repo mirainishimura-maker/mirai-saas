@@ -5,6 +5,7 @@ import { Download, RotateCcw } from 'lucide-react'
 import { simularSostenibilidad, soles, useMirai } from '@/lib/store'
 import { claveDia } from '@/lib/fecha'
 import { supabase } from '@/lib/supabase/navegador'
+import AgendaAbierta from '@/components/agenda-abierta'
 import {
   BotonPrimario,
   BotonSuave,
@@ -214,6 +215,12 @@ export default function Ajustes() {
           )}
         </div>
       </form>
+
+      {!esMuestra && (
+        <div className="mt-12 max-w-2xl">
+          <AgendaAbierta />
+        </div>
+      )}
 
       <div className="mt-12 max-w-2xl rounded-lg border border-border-sand bg-surface-container-low p-6">
         <Rotulo>Tus datos</Rotulo>

@@ -28,6 +28,7 @@ import {
   Rotulo,
   Tarjeta,
 } from '@/components/ui'
+import ReservasEnlace from '@/components/reservas-enlace'
 
 export default function PaginaCalendario() {
   return (
@@ -138,6 +139,7 @@ function Calendario() {
         </div>
 
         <aside className="space-y-6 lg:col-span-4">
+          <ReservasEnlace />
           <Tarjeta>
             <MiniMes
               mes={mesVisible}

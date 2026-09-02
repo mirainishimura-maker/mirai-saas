@@ -45,6 +45,6 @@ export const config = {
   matcher: [
     // Todo menos los archivos estáticos, las imágenes y la ruta de salud: el
     // monitor la consulta cada pocos minutos y no tiene sesión que refrescar.
-    '/((?!api/salud|_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api/salud|agendar|_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
